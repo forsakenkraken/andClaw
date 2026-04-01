@@ -32,8 +32,9 @@ class GatewayWatchdogRecoveryWorker(
         private const val UNIQUE_WORK_NAME = "gateway_watchdog_recovery"
         private const val CHANNEL_ID = "andclaw_watchdog_recovery"
         private const val NOTIFICATION_ID = 30101
-        private const val HEALTH_PROBE_TIMEOUT_MS = 8_000L
+        private const val HEALTH_PROBE_TIMEOUT_MS = 15_000L
         private const val STARTING_RECOVERY_GRACE_PERIOD_SECONDS = 300L
+        private const val RUNNING_HEALTH_GRACE_PERIOD_SECONDS = 90L
 
         internal enum class RecoveryAction {
             NONE,
@@ -48,18 +49,13 @@ class GatewayWatchdogRecoveryWorker(
             runningHealthy: Boolean,
             startupAttemptActive: Boolean = false,
             startupUptimeSeconds: Long = 0L,
+            runningUptimeSeconds: Long = Long.MAX_VALUE,
         ): RecoveryAction {
-            if (startupAttemptActive) {
-                if (status == GatewayStatus.STARTING) {
-                    return if (startupUptimeSeconds < STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
-                        RecoveryAction.NONE
-                    } else {
-                        RecoveryAction.RESTART
-                    }
-                }
-                if (serviceActive && startupUptimeSeconds < STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
-                    return RecoveryAction.NONE
-                }
+            if (startupAttemptActive && startupUptimeSeconds < STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
+                return RecoveryAction.NONE
+            }
+            if (startupAttemptActive && startupUptimeSeconds >= STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
+                return RecoveryAction.RESTART
             }
 
             return when (status) {
@@ -69,6 +65,7 @@ class GatewayWatchdogRecoveryWorker(
                 GatewayStatus.RUNNING -> {
                     when {
                         !serviceActive && runningHealthy -> RecoveryAction.ATTACH
+                        !runningHealthy && runningUptimeSeconds < RUNNING_HEALTH_GRACE_PERIOD_SECONDS -> RecoveryAction.NONE
                         !runningHealthy -> RecoveryAction.RESTART
                         serviceActive -> RecoveryAction.NONE
                         else -> RecoveryAction.RESTART
@@ -107,7 +104,9 @@ class GatewayWatchdogRecoveryWorker(
         var status = gatewayState?.status
         val serviceActive = GatewayService.isInstanceActive
         val startupAttemptAgeSeconds = processManager?.startupAttemptAgeSeconds()
-        val startupAttemptActive = startupAttemptAgeSeconds != null
+        // processManager가 null(서비스 재생성 중)이면 prefs에서 startup attempt 상태를 읽는다
+        val startupAttemptActive = startupAttemptAgeSeconds != null ||
+            (processManager == null && prefs.getGatewaySurvivorMetadata()?.startupAttemptActive == true)
         val runningHealthy = if (status == GatewayStatus.RUNNING) {
             val healthy = processManager?.probeGatewayHealth(timeoutMs = HEALTH_PROBE_TIMEOUT_MS) == true
             gatewayState = processManager?.gatewayState?.value ?: gatewayState
@@ -120,12 +119,18 @@ class GatewayWatchdogRecoveryWorker(
         } else {
             true
         }
+        val runningUptimeSeconds = if (status == GatewayStatus.RUNNING) {
+            gatewayState?.uptime ?: 0L
+        } else {
+            Long.MAX_VALUE
+        }
         val recoveryAction = determineRecoveryAction(
             status = status,
             serviceActive = serviceActive,
             runningHealthy = runningHealthy,
             startupAttemptActive = startupAttemptActive,
             startupUptimeSeconds = startupAttemptAgeSeconds ?: 0L,
+            runningUptimeSeconds = runningUptimeSeconds,
         )
         val needsRecovery = recoveryAction != RecoveryAction.NONE
         if (!needsRecovery) {

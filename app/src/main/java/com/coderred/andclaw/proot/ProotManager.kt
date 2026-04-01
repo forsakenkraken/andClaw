@@ -29,7 +29,7 @@ class ProotManager(private val context: Context) {
 
         // 3분할 번들 에셋
         const val SYSTEM_TOOLS_ASSET = "system-tools-arm64.tar.gz.bin"
-        const val OPENCLAW_ASSET_DIR = "openclaw"
+        const val OPENCLAW_ASSET = "openclaw-arm64.tar.gz.bin"
         const val PLAYWRIGHT_ASSET = "playwright-chromium-arm64.tar.gz.bin"
         private const val PLAYWRIGHT_CHROME_MARKER = ".playwright_chrome_path"
     }

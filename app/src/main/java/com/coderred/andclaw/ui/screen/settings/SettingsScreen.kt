@@ -1705,9 +1705,6 @@ fun SettingsScreen(
             isOpenClawUpdateRunning = isOpenClawUpdateRunning,
             progress = setupState.progress,
             stepLabel = stringResource(setupState.currentStep.displayNameRes),
-            isFileCountMode = setupState.currentStep == SetupStep.INSTALLING_OPENCLAW,
-            downloadedBytes = setupState.downloadedBytes,
-            totalBytes = setupState.totalBytes,
         )
     }
 
@@ -1830,9 +1827,6 @@ private fun RecoveryInstallProgressDialog(
     isOpenClawUpdateRunning: Boolean,
     progress: Float,
     stepLabel: String,
-    isFileCountMode: Boolean,
-    downloadedBytes: Long,
-    totalBytes: Long,
 ) {
     val titleText = when {
         isOpenClawUpdateRunning -> stringResource(R.string.settings_openclaw_update_action)
@@ -1901,52 +1895,16 @@ private fun RecoveryInstallProgressDialog(
                             .height(8.dp),
                     )
                     Text(
-                        text = if (isFileCountMode) {
-                            val safeDownloaded = downloadedBytes.coerceAtLeast(0L)
-                            "${(progress.coerceIn(0f, 1f) * 100).toInt()}% · $stepLabel · " +
-                                if (totalBytes > 0L) {
-                                    "($safeDownloaded/$totalBytes)"
-                                } else {
-                                    "($safeDownloaded/?)"
-                                }
-                        } else {
-                            "${(progress.coerceIn(0f, 1f) * 100).toInt()}% · $stepLabel"
-                        },
+                        text = "${(progress.coerceIn(0f, 1f) * 100).toInt()}% · $stepLabel",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (!isFileCountMode && downloadedBytes > 0L) {
-                        Text(
-                            text = if (totalBytes > 0L) {
-                                "${formatBytesForProgress(downloadedBytes)} / ${formatBytesForProgress(totalBytes)}"
-                            } else {
-                                formatBytesForProgress(downloadedBytes)
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
                 }
             }
         }
     }
 }
 
-private fun formatBytesForProgress(bytes: Long): String {
-    if (bytes <= 0L) return "0 B"
-    val units = arrayOf("B", "KB", "MB", "GB")
-    var value = bytes.toDouble()
-    var unitIndex = 0
-    while (value >= 1024 && unitIndex < units.lastIndex) {
-        value /= 1024.0
-        unitIndex++
-    }
-    return if (value >= 100 || unitIndex == 0) {
-        String.format(Locale.US, "%.0f %s", value, units[unitIndex])
-    } else {
-        String.format(Locale.US, "%.1f %s", value, units[unitIndex])
-    }
-}
 
 @Composable
 private fun ChannelDisconnectProgressDialog(channelLabel: String) {

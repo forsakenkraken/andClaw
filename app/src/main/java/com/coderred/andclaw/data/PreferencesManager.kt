@@ -1591,7 +1591,7 @@ private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fa
         setSelectedModels(provider, listOf(model), primary = model.id)
     }
 
-    suspend fun setSelectedModelId(modelId: String) {
+    suspend fun setSelectedModelId(modelId: String) = withContext(Dispatchers.IO) {
         val provider = apiProvider.first()
         val normalizedModelId = canonicalizeModelIdForProvider(provider, modelId)
         context.dataStore.edit {
@@ -1604,7 +1604,7 @@ private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fa
         }
         if (normalizedModelId.isBlank()) {
             clearSelectedModels(provider)
-            return
+            return@withContext
         }
         val fallbackMetadata = resolveDefaultModelMetadata(provider, normalizedModelId)
         setSelectedModelIds(

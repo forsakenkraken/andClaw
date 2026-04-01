@@ -14,8 +14,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -34,6 +37,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -285,21 +290,9 @@ class MainActivity : ComponentActivity() {
                         } else {
                             0f
                         }
-                        val screenDownloadedBytes = if (startupUpdateStatus == StartupBundleUpdateStatus.UPDATING) {
-                            setupState.downloadedBytes
-                        } else {
-                            0L
-                        }
-                        val screenTotalBytes = if (startupUpdateStatus == StartupBundleUpdateStatus.UPDATING) {
-                            setupState.totalBytes
-                        } else {
-                            0L
-                        }
                         startupBundleUpdateScreen(
                             step = screenStep,
                             progress = screenProgress,
-                            downloadedBytes = screenDownloadedBytes,
-                            totalBytes = screenTotalBytes,
                         )
                     } else {
                         AndClawNavGraph(
@@ -402,50 +395,37 @@ class MainActivity : ComponentActivity() {
 
                     if (startupOpenClawUpdateRunning) {
                         val safeProgress = setupState.progress.coerceIn(0f, 1f)
-                        val isFileCountMode = setupState.currentStep == SetupStep.INSTALLING_OPENCLAW
                         AlertDialog(
                             onDismissRequest = {},
                             confirmButton = {},
-                            title = { Text(stringResource(R.string.settings_openclaw_update_running)) },
+                            title = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(stringResource(setupState.currentStep.displayNameRes))
+                                }
+                            },
                             text = {
-                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    ) {
-                                        CircularProgressIndicator()
-                                        Text(stringResource(R.string.settings_openclaw_update_running))
-                                    }
+                                Column {
                                     LinearProgressIndicator(
                                         progress = { safeProgress },
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(6.dp)
+                                            .clip(RoundedCornerShape(3.dp)),
                                     )
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Text(
-                                        text = if (isFileCountMode) {
-                                            val safeDownloaded = setupState.downloadedBytes.coerceAtLeast(0L)
-                                            "${(safeProgress * 100).toInt()}% · " +
-                                                "${stringResource(setupState.currentStep.displayNameRes)} · " +
-                                                if (setupState.totalBytes > 0L) {
-                                                    "($safeDownloaded/${setupState.totalBytes})"
-                                                } else {
-                                                    "($safeDownloaded/?)"
-                                                }
-                                        } else {
-                                            "${(safeProgress * 100).toInt()}% · " +
-                                                stringResource(setupState.currentStep.displayNameRes)
-                                        },
+                                        text = "${(safeProgress * 100).toInt()}%",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
                                     )
-                                    if (!isFileCountMode && setupState.downloadedBytes > 0L) {
-                                        Text(
-                                            text = if (setupState.totalBytes > 0L) {
-                                                "${formatBytesForProgress(setupState.downloadedBytes)} / " +
-                                                    formatBytesForProgress(setupState.totalBytes)
-                                            } else {
-                                                formatBytesForProgress(setupState.downloadedBytes)
-                                            },
-                                            style = MaterialTheme.typography.bodySmall,
-                                        )
-                                    }
                                 }
                             },
                         )
@@ -595,21 +575,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            val result = app.setupManager.runOpenClawManualSync()
-            if (result.fullReinstall) {
-                StartupOpenClawUpdateResult(
-                    success = true,
-                    message = getString(R.string.dashboard_update_action_done),
-                )
-            } else {
-                val message = getString(
-                    R.string.settings_openclaw_update_result_incremental,
-                    result.copiedCount,
-                    result.deletedCount,
-                    result.skippedCount,
-                )
-                StartupOpenClawUpdateResult(success = true, message = message)
-            }
+            app.setupManager.runOpenClawManualSync()
+            StartupOpenClawUpdateResult(
+                success = true,
+                message = getString(R.string.dashboard_update_action_done),
+            )
         } catch (error: Exception) {
             StartupOpenClawUpdateResult(
                 success = false,
@@ -669,31 +639,13 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private fun formatBytesForProgress(bytes: Long): String {
-    if (bytes <= 0L) return "0 B"
-    val units = arrayOf("B", "KB", "MB", "GB")
-    var value = bytes.toDouble()
-    var unitIndex = 0
-    while (value >= 1024 && unitIndex < units.lastIndex) {
-        value /= 1024.0
-        unitIndex++
-    }
-    return if (value >= 100 || unitIndex == 0) {
-        String.format(Locale.US, "%.0f %s", value, units[unitIndex])
-    } else {
-        String.format(Locale.US, "%.1f %s", value, units[unitIndex])
-    }
-}
 
 @androidx.compose.runtime.Composable
 private fun startupBundleUpdateScreen(
     step: SetupStep,
     progress: Float = 0f,
-    downloadedBytes: Long = 0L,
-    totalBytes: Long = 0L,
 ) {
     val safeProgress = progress.coerceIn(0f, 1f)
-    val isFileCountMode = step == SetupStep.INSTALLING_OPENCLAW
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -704,44 +656,36 @@ private fun startupBundleUpdateScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            CircularProgressIndicator()
-            Text(
-                text = stringResource(step.displayNameRes),
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(top = 16.dp),
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(16.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = stringResource(step.displayNameRes),
+                    style = MaterialTheme.typography.titleMedium,
+                )
+            }
             LinearProgressIndicator(
                 progress = { safeProgress },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 14.dp),
+                    .padding(top = 16.dp)
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(3.dp)),
             )
             Text(
-                text = if (isFileCountMode) {
-                    val safeDownloaded = downloadedBytes.coerceAtLeast(0L)
-                    "${(safeProgress * 100).toInt()}% · " +
-                        if (totalBytes > 0L) {
-                            "($safeDownloaded/$totalBytes)"
-                        } else {
-                            "($safeDownloaded/?)"
-                        }
-                } else {
-                    "${(safeProgress * 100).toInt()}%"
-                },
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(top = 10.dp),
+                text = "${(safeProgress * 100).toInt()}%",
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 12.dp),
             )
-            if (!isFileCountMode && downloadedBytes > 0L) {
-                Text(
-                    text = if (totalBytes > 0L) {
-                        "${formatBytesForProgress(downloadedBytes)} / ${formatBytesForProgress(totalBytes)}"
-                    } else {
-                        formatBytesForProgress(downloadedBytes)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
         }
     }
 }

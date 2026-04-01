@@ -13,6 +13,13 @@ object OpenClawModelCatalogReader {
     private const val OLLAMA_DEFAULT_MAX_TOKENS = 8_192
     const val LEGACY_BUILTIN_MODELS_PATH =
         "usr/local/lib/node_modules/openclaw/node_modules/@mariozechner/pi-ai/dist/models.generated.js"
+
+    @Volatile
+    private var appContext: android.content.Context? = null
+
+    fun init(context: android.content.Context) {
+        appContext = context.applicationContext
+    }
     const val RUNTIME_MODEL_CATALOG_DIR = "usr/local/lib/node_modules/openclaw/dist"
     private const val RUNTIME_MODEL_CATALOG_ENTRYPOINT = "entry.js"
     private const val RUNTIME_MODEL_CATALOG_FALLBACK_ENTRYPOINT = "index.js"
@@ -234,15 +241,42 @@ object OpenClawModelCatalogReader {
     }
 
     fun loadProviderModels(rootfsDir: File?, provider: String): List<ModelEntry> {
-        val legacyContent = readLegacyModelsContent(rootfsDir) ?: return emptyList()
         val normalizedProvider = provider.trim().lowercase()
         if (normalizedProvider.isBlank()) return emptyList()
 
+        val bundled = loadFromBundledCatalog(normalizedProvider)
+        if (bundled.isNotEmpty()) return bundled
+
+        val legacyContent = readLegacyModelsContent(rootfsDir) ?: return emptyList()
         val baseEntries = extractProviderModelEntries(legacyContent, normalizedProvider)
         val syntheticEntries = loadSyntheticFallbackEntries(rootfsDir, normalizedProvider, baseEntries)
 
         return (baseEntries + syntheticEntries)
             .distinctBy { it.id.lowercase() }
+    }
+
+    private var bundledCatalogCache: JSONObject? = null
+
+    private fun loadFromBundledCatalog(provider: String): List<ModelEntry> {
+        val ctx = appContext ?: return emptyList()
+        val json = bundledCatalogCache ?: runCatching {
+            ctx.assets.open("model-catalog.json").bufferedReader().use { it.readText() }
+                .let { JSONObject(it) }
+        }.getOrNull()?.also { bundledCatalogCache = it } ?: return emptyList()
+
+        val models = json.optJSONArray(provider) ?: return emptyList()
+        return (0 until models.length()).mapNotNull { i ->
+            val m = models.optJSONObject(i) ?: return@mapNotNull null
+            ModelEntry(
+                id = m.optString("id").takeIf { it.isNotBlank() } ?: return@mapNotNull null,
+                name = m.optString("name").ifBlank { m.optString("id") },
+                provider = m.optString("provider", provider),
+                contextWindow = m.optInt("contextWindow", 0),
+                maxTokens = m.optInt("maxTokens", 0),
+                supportsReasoning = m.optBoolean("reasoning", false),
+                supportsImages = m.optBoolean("images", false),
+            )
+        }
     }
 
     fun loadOpenRouterModelIds(rootfsDir: File?): Set<String> {

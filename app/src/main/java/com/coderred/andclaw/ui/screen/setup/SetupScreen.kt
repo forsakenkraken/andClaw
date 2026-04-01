@@ -5,6 +5,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -90,14 +92,29 @@ fun SetupScreen(
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(
-                        text = stringResource(state.currentStep.displayNameRes),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    // 단계명 + 써클 로딩
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                    ) {
+                        if (state.isInProgress && state.currentStep != SetupStep.COMPLETE) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
+                        Text(
+                            text = stringResource(state.currentStep.displayNameRes),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(20.dp))
 
+                    // 프로그레스 바
                     LinearProgressIndicator(
                         progress = { state.progress },
                         modifier = Modifier
@@ -108,20 +125,9 @@ fun SetupScreen(
 
                     Spacer(modifier = Modifier.height(12.dp))
 
+                    // 퍼센트
                     Text(
-                        text = if (
-                            state.currentStep == SetupStep.INSTALLING_OPENCLAW
-                        ) {
-                            val safeDownloaded = state.downloadedBytes.coerceAtLeast(0L)
-                            "${(state.progress * 100).toInt()}% · " +
-                                if (state.totalBytes > 0L) {
-                                    "($safeDownloaded/${state.totalBytes})"
-                                } else {
-                                    "($safeDownloaded/?)"
-                                }
-                        } else {
-                            "${(state.progress * 100).toInt()}%"
-                        },
+                        text = "${(state.progress * 100).toInt()}%",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,

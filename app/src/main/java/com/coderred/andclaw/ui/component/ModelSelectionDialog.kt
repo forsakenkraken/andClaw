@@ -140,17 +140,20 @@ fun ModelSelectionDialog(
                 else -> {
                     val freeModels = models.filter { it.isFree }
                     val paidModels = models.filter { !it.isFree }
+                    val showSections = freeModels.isNotEmpty() && paidModels.isNotEmpty()
 
                     LazyColumn(modifier = Modifier.height(420.dp)) {
                         if (freeModels.isNotEmpty()) {
-                            item {
-                                SectionLabel(stringResource(R.string.settings_model_section_free))
-                                Text(
-                                    text = stringResource(R.string.settings_model_free_warning),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
-                                )
+                            if (showSections) {
+                                item {
+                                    SectionLabel(stringResource(R.string.settings_model_section_free))
+                                    Text(
+                                        text = stringResource(R.string.settings_model_free_warning),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(start = 4.dp, end = 4.dp, bottom = 8.dp),
+                                    )
+                                }
                             }
                             items(freeModels) { model ->
                                 val checked = localSelectedIds.contains(model.id)
@@ -168,9 +171,11 @@ fun ModelSelectionDialog(
                             }
                         }
                         if (paidModels.isNotEmpty()) {
-                            item {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                SectionLabel(stringResource(R.string.settings_model_section_paid))
+                            if (showSections) {
+                                item {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    SectionLabel(stringResource(R.string.settings_model_section_paid))
+                                }
                             }
                             items(paidModels) { model ->
                                 val checked = localSelectedIds.contains(model.id)

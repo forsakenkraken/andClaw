@@ -81,26 +81,19 @@ class GatewayWatchdogReceiver : BroadcastReceiver() {
             previousRunningUnhealthyFailures: Int = 0,
             runningUnhealthyRecoveryThreshold: Int = RUNNING_UNHEALTHY_RECOVERY_THRESHOLD,
         ): RecoveryDecision {
-            if (startupAttemptActive) {
-                if (status == GatewayStatus.STARTING) {
-                    return if (startupUptimeSeconds < STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
-                        RecoveryDecision(
-                            needsRecovery = false,
-                            nextRunningUnhealthyFailures = 0,
-                        )
-                    } else {
-                        RecoveryDecision(
-                            needsRecovery = true,
-                            nextRunningUnhealthyFailures = 0,
-                        )
-                    }
-                }
-                if (serviceActive && startupUptimeSeconds < STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
-                    return RecoveryDecision(
-                        needsRecovery = false,
-                        nextRunningUnhealthyFailures = 0,
-                    )
-                }
+            if (startupAttemptActive && startupUptimeSeconds < STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
+                // 시작 시도 중이고 grace period 내 → 서비스 재생성/재시작 중일 수 있으므로 복구하지 않음
+                return RecoveryDecision(
+                    needsRecovery = false,
+                    nextRunningUnhealthyFailures = 0,
+                )
+            }
+            if (startupAttemptActive && startupUptimeSeconds >= STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
+                // grace period 초과 → 시작 실패로 판단
+                return RecoveryDecision(
+                    needsRecovery = true,
+                    nextRunningUnhealthyFailures = 0,
+                )
             }
 
             return when (status) {
@@ -112,24 +105,23 @@ class GatewayWatchdogReceiver : BroadcastReceiver() {
                 )
                 GatewayStatus.RUNNING -> {
                     if (!serviceActive) {
+                        // 게이트웨이가 RUNNING이면 죽이지 않음 — RecoveryWorker에서 ATTACH로 처리
                         RecoveryDecision(
                             needsRecovery = true,
                             nextRunningUnhealthyFailures = 0,
                         )
+                    } else if (runningHealthy) {
+                        RecoveryDecision(
+                            needsRecovery = false,
+                            nextRunningUnhealthyFailures = 0,
+                        )
                     } else {
-                        if (runningHealthy) {
-                            RecoveryDecision(
-                                needsRecovery = false,
-                                nextRunningUnhealthyFailures = 0,
-                            )
-                        } else {
-                            val nextFailureCount = (previousRunningUnhealthyFailures + 1).coerceAtLeast(1)
-                            val shouldRecover = nextFailureCount >= runningUnhealthyRecoveryThreshold
-                            RecoveryDecision(
-                                needsRecovery = shouldRecover,
-                                nextRunningUnhealthyFailures = if (shouldRecover) 0 else nextFailureCount,
-                            )
-                        }
+                        val nextFailureCount = (previousRunningUnhealthyFailures + 1).coerceAtLeast(1)
+                        val shouldRecover = nextFailureCount >= runningUnhealthyRecoveryThreshold
+                        RecoveryDecision(
+                            needsRecovery = shouldRecover,
+                            nextRunningUnhealthyFailures = if (shouldRecover) 0 else nextFailureCount,
+                        )
                     }
                 }
                 GatewayStatus.STARTING -> {
@@ -211,7 +203,8 @@ class GatewayWatchdogReceiver : BroadcastReceiver() {
                 var status = gatewayState?.status
                 val serviceActive = GatewayService.isInstanceActive
                 val startupAttemptAgeSeconds = processManager?.startupAttemptAgeSeconds()
-                val startupAttemptActive = startupAttemptAgeSeconds != null
+                val startupAttemptActive = startupAttemptAgeSeconds != null ||
+                    (processManager == null && prefs.getGatewaySurvivorMetadata()?.startupAttemptActive == true)
                 val previousRunningUnhealthyFailures = runningUnhealthyFailures.get()
                 val runningHealthy = if (status == GatewayStatus.RUNNING) {
                     val healthy = processManager?.probeGatewayHealth(timeoutMs = HEALTH_PROBE_TIMEOUT_MS) == true

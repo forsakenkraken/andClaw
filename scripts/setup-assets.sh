@@ -473,14 +473,13 @@ else
     BUNDLE_FINGERPRINT_NEEDS_UPDATE="true"
 fi
 
-# ── 5. OpenClaw 파일 자산 (Docker Build 2) ──
-OPENCLAW_ASSET_DIR="$ASSETS_DIR/openclaw"
-OPENCLAW_MAIN="$OPENCLAW_ASSET_DIR/usr/local/lib/node_modules/openclaw/openclaw.mjs"
-OPENCLAW_BIN="$OPENCLAW_ASSET_DIR/usr/local/bin/openclaw"
-OPENCLAW_ANTHROPIC_PARSER="$OPENCLAW_ASSET_DIR/usr/local/lib/node_modules/openclaw/node_modules/@anthropic-ai/sdk/andclaw_us__vendor/partial-json-parser/parser.js"
-OPENCLAW_PACKAGE_JSON="$OPENCLAW_ASSET_DIR/usr/local/lib/node_modules/openclaw/package.json"
+# ── 5. OpenClaw tar.gz 번들 (Docker Build 2) ──
+OPENCLAW_TAR="$ASSETS_DIR/openclaw-arm64.tar.gz.bin"
 OPENCLAW_CACHE_DIR="$PROJECT_DIR/install_time_assets/cache"
-OPENCLAW_CACHE_ARCHIVE="$OPENCLAW_CACHE_DIR/openclaw-assets.tar.gz"
+OPENCLAW_CACHE_ARCHIVE="$OPENCLAW_CACHE_DIR/openclaw-arm64.tar.gz.bin"
+# 버전 확인을 위해 임시로 디렉토리를 사용 (캐시 복원 시)
+OPENCLAW_TEMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$OPENCLAW_TEMP_DIR"' EXIT
 
 extract_json_version() {
     local json_path="$1"
@@ -506,24 +505,17 @@ restore_openclaw_from_cache() {
     fi
 
     echo "   OpenClaw 캐시 복원 시도: $OPENCLAW_CACHE_ARCHIVE"
-    rm -rf "$OPENCLAW_ASSET_DIR"
-    mkdir -p "$ASSETS_DIR"
-
-    if ! tar -xzf "$OPENCLAW_CACHE_ARCHIVE" -C "$ASSETS_DIR"; then
-        echo "   WARNING: OpenClaw 캐시 복원 실패"
-        return 1
-    fi
-
-    [ -d "$OPENCLAW_ASSET_DIR" ]
+    cp -f "$OPENCLAW_CACHE_ARCHIVE" "$OPENCLAW_TAR" 2>/dev/null || return 1
+    [ -f "$OPENCLAW_TAR" ]
 }
 
 save_openclaw_to_cache() {
-    if [ ! -d "$OPENCLAW_ASSET_DIR" ]; then
+    if [ ! -f "$OPENCLAW_TAR" ]; then
         return 1
     fi
 
     mkdir -p "$OPENCLAW_CACHE_DIR"
-    tar -czf "$OPENCLAW_CACHE_ARCHIVE.tmp" -C "$ASSETS_DIR" openclaw
+    cp -f "$OPENCLAW_TAR" "$OPENCLAW_CACHE_ARCHIVE.tmp" 2>/dev/null || return 1
     if ! mv -f "$OPENCLAW_CACHE_ARCHIVE.tmp" "$OPENCLAW_CACHE_ARCHIVE" 2>/dev/null; then
         cp -f "$OPENCLAW_CACHE_ARCHIVE.tmp" "$OPENCLAW_CACHE_ARCHIVE" 2>/dev/null || true
         rm -f "$OPENCLAW_CACHE_ARCHIVE.tmp" 2>/dev/null || true
@@ -535,56 +527,34 @@ save_openclaw_to_cache() {
     echo "   OpenClaw 캐시 저장: $OPENCLAW_CACHE_ARCHIVE"
 }
 
-ensure_openclaw_json_parser_shim() {
-    for sdk_root in \
-        "$OPENCLAW_ASSET_DIR/usr/local/lib/node_modules/openclaw/node_modules/@anthropic-ai/sdk" \
-        "$OPENCLAW_ASSET_DIR/usr/local/lib/node_modules/openclaw/extensions/memory-lancedb/node_modules/@anthropic-ai/sdk" \
-    ; do
-        partial_js="$sdk_root/_vendor/partial-json-parser/parser.js"
-        partial_mjs="$sdk_root/_vendor/partial-json-parser/parser.mjs"
-        shim_dir="$sdk_root/_vendor/json-parser"
-        if [ -f "$partial_js" ]; then
-            mkdir -p "$shim_dir"
-            printf '%s\n' 'module.exports = require("../partial-json-parser/parser.js");' > "$shim_dir/json-parser.js"
-        fi
-        if [ -f "$partial_mjs" ]; then
-            mkdir -p "$shim_dir"
-            printf '%s\n' 'export * from "../partial-json-parser/parser.mjs";' > "$shim_dir/json-parser.mjs"
-        fi
-    done
-}
-
-encode_openclaw_underscore_paths() {
-    local openclaw_root="$OPENCLAW_ASSET_DIR/usr/local/lib/node_modules/openclaw"
-    if [ ! -d "$openclaw_root" ]; then
-        return
+# tar.gz에서 package.json을 추출하여 버전을 읽는다
+extract_openclaw_version_from_tar() {
+    local tar_file="$1"
+    if [ ! -f "$tar_file" ]; then
+        return 1
     fi
-    # Android assets 패키징에서 '_*' 파일/디렉토리가 누락될 수 있어 안전한 이름으로 인코딩
-    # files first, then directories (depth-first) for safe renaming
-    find "$openclaw_root" -depth -name '_*' -type f -exec bash -c '
-        for f; do
-            dir="$(dirname "$f")"
-            name="$(basename "$f")"
-            mv "$f" "$dir/andclaw_us__${name#_}"
-        done
-    ' _ {} +
-    find "$openclaw_root" -depth -name '_*' -type d -exec bash -c '
-        for d; do
-            parent="$(dirname "$d")"
-            name="$(basename "$d")"
-            mv "$d" "$parent/andclaw_us__${name#_}"
-        done
-    ' _ {} +
+    tar xzf "$tar_file" -C "$OPENCLAW_TEMP_DIR" \
+        "usr/local/lib/node_modules/openclaw/package.json" 2>/dev/null || return 1
+    local pkg_json="$OPENCLAW_TEMP_DIR/usr/local/lib/node_modules/openclaw/package.json"
+    if [ -f "$pkg_json" ]; then
+        extract_json_version "$pkg_json" 2>/dev/null
+    else
+        return 1
+    fi
 }
 
 
-OPENCLAW_ASSET_VERSION="$(extract_json_version "$OPENCLAW_PACKAGE_JSON" 2>/dev/null || true)"
+OPENCLAW_ASSET_VERSION=""
+if [ -f "$OPENCLAW_TAR" ]; then
+    OPENCLAW_ASSET_VERSION="$(extract_openclaw_version_from_tar "$OPENCLAW_TAR" 2>/dev/null || true)"
+    rm -rf "$OPENCLAW_TEMP_DIR"/* 2>/dev/null || true
+fi
 OPENCLAW_LATEST_VERSION="$(get_openclaw_latest_version 2>/dev/null || true)"
 OPENCLAW_BUILD_REASON=""
 OPENCLAW_WAS_REBUILT="false"
 
-if [ ! -f "$OPENCLAW_MAIN" ] || [ ! -f "$OPENCLAW_BIN" ] || [ ! -f "$OPENCLAW_ANTHROPIC_PARSER" ]; then
-    OPENCLAW_BUILD_REASON="필수 파일 누락"
+if [ ! -f "$OPENCLAW_TAR" ]; then
+    OPENCLAW_BUILD_REASON="tar.gz.bin 파일 없음"
 elif [ -n "$OPENCLAW_ASSET_VERSION" ] && [ -n "$OPENCLAW_LATEST_VERSION" ] && version_lt "$OPENCLAW_ASSET_VERSION" "$OPENCLAW_LATEST_VERSION"; then
     OPENCLAW_BUILD_REASON="버전 업그레이드 필요 ($OPENCLAW_ASSET_VERSION -> $OPENCLAW_LATEST_VERSION)"
 elif [ -z "$OPENCLAW_LATEST_VERSION" ]; then
@@ -593,15 +563,12 @@ fi
 
 if [ -n "$OPENCLAW_BUILD_REASON" ] && [ -f "$OPENCLAW_CACHE_ARCHIVE" ]; then
     if restore_openclaw_from_cache; then
-        OPENCLAW_ASSET_VERSION="$(extract_json_version "$OPENCLAW_PACKAGE_JSON" 2>/dev/null || true)"
+        OPENCLAW_ASSET_VERSION="$(extract_openclaw_version_from_tar "$OPENCLAW_TAR" 2>/dev/null || true)"
+        rm -rf "$OPENCLAW_TEMP_DIR"/* 2>/dev/null || true
         OPENCLAW_BUILD_REASON=""
-        # 캐시 복원으로 openclaw 디렉토리가 실제 변경될 수 있으므로
-        # fingerprint는 반드시 재생성한다.
         BUNDLE_FINGERPRINT_NEEDS_UPDATE="true"
 
-        if [ ! -f "$OPENCLAW_MAIN" ] || [ ! -f "$OPENCLAW_BIN" ] || [ ! -f "$OPENCLAW_ANTHROPIC_PARSER" ]; then
-            OPENCLAW_BUILD_REASON="캐시 복원 결과 필수 파일 누락"
-        elif [ -n "$OPENCLAW_ASSET_VERSION" ] && [ -n "$OPENCLAW_LATEST_VERSION" ] && version_lt "$OPENCLAW_ASSET_VERSION" "$OPENCLAW_LATEST_VERSION"; then
+        if [ -n "$OPENCLAW_ASSET_VERSION" ] && [ -n "$OPENCLAW_LATEST_VERSION" ] && version_lt "$OPENCLAW_ASSET_VERSION" "$OPENCLAW_LATEST_VERSION"; then
             OPENCLAW_BUILD_REASON="캐시 버전 업그레이드 필요 ($OPENCLAW_ASSET_VERSION -> $OPENCLAW_LATEST_VERSION)"
         else
             echo "   OpenClaw 캐시 복원 성공"
@@ -610,16 +577,16 @@ if [ -n "$OPENCLAW_BUILD_REASON" ] && [ -f "$OPENCLAW_CACHE_ARCHIVE" ]; then
 fi
 
 if [ -z "$OPENCLAW_BUILD_REASON" ]; then
-    echo "[5/7] openclaw 디렉토리 자산 이미 존재, 건너뜀"
+    echo "[5/7] openclaw-arm64.tar.gz.bin 이미 존재, 건너뜀"
     if [ -n "$OPENCLAW_ASSET_VERSION" ]; then
         echo "   버전: $OPENCLAW_ASSET_VERSION"
     fi
     if [ -n "$OPENCLAW_LATEST_VERSION" ]; then
         echo "   최신: $OPENCLAW_LATEST_VERSION"
     fi
-    echo "   크기: $(du -sh "$OPENCLAW_ASSET_DIR" | cut -f1)"
+    echo "   크기: $(du -h "$OPENCLAW_TAR" | cut -f1)"
 else
-    echo "[5/7] OpenClaw 디렉토리 자산 빌드 중 (Docker)..."
+    echo "[5/7] OpenClaw tar.gz 번들 빌드 중 (Docker)..."
     echo "   사유: $OPENCLAW_BUILD_REASON"
     check_docker
 
@@ -630,24 +597,22 @@ else
     echo "   npm install -g $OPENCLAW_INSTALL_SPEC"
 
     docker rm -f andclaw-openclaw-builder 2>/dev/null || true
-    rm -rf "$OPENCLAW_ASSET_DIR"
-    mkdir -p "$OPENCLAW_ASSET_DIR/usr/local/lib/node_modules" "$OPENCLAW_ASSET_DIR/usr/local/bin"
 
-    docker run --platform linux/arm64 --name andclaw-openclaw-builder ubuntu:24.04 bash -c "
+    # 베이스 이미지 빌드/재사용 (apt + Node.js 사전 설치)
+    BUILDER_IMAGE="andclaw-openclaw-base:node-$NODEJS_VERSION"
+    if ! docker image inspect "$BUILDER_IMAGE" >/dev/null 2>&1; then
+        echo "   베이스 이미지 빌드 중: $BUILDER_IMAGE"
+        docker build --platform linux/arm64 \
+            --build-arg NODEJS_VERSION=$NODEJS_VERSION \
+            -t "$BUILDER_IMAGE" \
+            -f "$SCRIPT_DIR/Dockerfile.openclaw-builder" \
+            "$SCRIPT_DIR"
+    else
+        echo "   베이스 이미지 재사용: $BUILDER_IMAGE"
+    fi
+
+    docker run --platform linux/arm64 -i --name andclaw-openclaw-builder "$BUILDER_IMAGE" bash -c "
         set -e
-        export DEBIAN_FRONTEND=noninteractive
-        apt-get update -qq
-        # node-gyp fallback 빌드를 위해 Python/컴파일러를 함께 설치한다.
-        apt-get install -y -qq --no-install-recommends \
-            curl ca-certificates git \
-            python3 python-is-python3 \
-            make g++ pkg-config
-
-        echo '--- Installing Node.js ---'
-        curl -fsSL https://nodejs.org/dist/$NODEJS_VERSION/node-$NODEJS_VERSION-linux-arm64.tar.gz | tar xz -C /usr/local --strip-components=1
-        node --version
-        python3 --version
-        npm --version
 
         echo '--- Installing OpenClaw ---'
         # 일부 환경에서 node-gyp가 python 경로를 자동 감지하지 못해 명시적으로 지정한다.
@@ -691,6 +656,9 @@ NODE
             cd \$WA_EXT && npm install --omit=dev 2>&1
             # extension 내부 .bin symlink도 제거
             find \$WA_EXT/node_modules -path '*/.bin/*' -type l -delete || true
+
+            # (pruning은 docker cp 후 호스트에서 실행)
+
             cd /
             du -sh \$WA_EXT/node_modules
         else
@@ -700,32 +668,64 @@ NODE
         # Windows docker cp에서 symlink 생성 권한 오류를 피하기 위해 .bin 심링크 제거
         find /usr/local/lib/node_modules/openclaw/node_modules -path '*/.bin/*' -type l -delete || true
 
+        # (pruning은 docker cp 후 호스트에서 실행)
+
         # openclaw bin symlink -> 셸 래퍼로 교체 (ESM 상대 경로 호환성)
         rm -f /usr/local/bin/openclaw
         printf '#!/bin/sh\nexec node /usr/local/lib/node_modules/openclaw/openclaw.mjs \"\$@\"\n' > /usr/local/bin/openclaw
         chmod +x /usr/local/bin/openclaw
 
         ls -lh /usr/local/bin/openclaw
+
+        echo '--- Creating tar bundle ---'
+        cd / && tar cf /tmp/openclaw-arm64.tar usr/local/lib/node_modules/openclaw usr/local/bin/openclaw
+        ls -lh /tmp/openclaw-arm64.tar
         echo '--- DONE ---'
     "
 
-    docker cp andclaw-openclaw-builder:/usr/local/lib/node_modules/openclaw "$OPENCLAW_ASSET_DIR/usr/local/lib/node_modules/openclaw"
-    docker cp andclaw-openclaw-builder:/usr/local/bin/openclaw "$OPENCLAW_ASSET_DIR/usr/local/bin/openclaw"
+    docker cp andclaw-openclaw-builder:/tmp/openclaw-arm64.tar /tmp/openclaw-arm64.tar
+
+    # proot ptrace 오버헤드 절감: node_modules에서 불필요한 파일 제거
+    echo "   호스트에서 node_modules pruning 중..."
+    PRUNE_DIR=/tmp/openclaw-prune-$$
+    mkdir -p "$PRUNE_DIR" && cd "$PRUNE_DIR"
+    tar xf /tmp/openclaw-arm64.tar
+    BEFORE=$(find . -type f | wc -l)
+    find . -path '*/node_modules/*' -name '*.d.ts' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -name '*.d.mts' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -name '*.d.cts' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -name '*.map' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -name 'README*' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -name 'CHANGELOG*' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -name 'LICENSE*' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -name 'LICENCE*' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -name '.npmignore' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -name '.eslintrc*' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -name 'tsconfig*' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -name '.editorconfig' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -name 'Makefile' -delete 2>/dev/null || true
+    find . -path '*/node_modules/*' -type d -empty -delete 2>/dev/null || true
+    AFTER=$(find . -type f | wc -l)
+    echo "   Pruned: $BEFORE -> $AFTER files"
+    tar cf /tmp/openclaw-arm64.tar usr/
+    cd / && rm -rf "$PRUNE_DIR"
+
+    echo "   호스트에서 gzip 압축 중..."
+    gzip -f /tmp/openclaw-arm64.tar
+    mv /tmp/openclaw-arm64.tar.gz "$OPENCLAW_TAR"
     docker rm andclaw-openclaw-builder
     OPENCLAW_WAS_REBUILT="true"
     BUNDLE_FINGERPRINT_NEEDS_UPDATE="true"
 
-    echo "   완료: $(du -sh "$OPENCLAW_ASSET_DIR" | cut -f1)"
+    OPENCLAW_ASSET_VERSION="$(extract_openclaw_version_from_tar "$OPENCLAW_TAR" 2>/dev/null || true)"
+    rm -rf "$OPENCLAW_TEMP_DIR"/* 2>/dev/null || true
+    echo "   완료: $(du -h "$OPENCLAW_TAR" | cut -f1)"
 fi
 
-# 버전이 이미 최신과 동일하면 OpenClaw 후처리는 건너뜀
-if [ -z "$OPENCLAW_BUILD_REASON" ] && [ -n "$OPENCLAW_ASSET_VERSION" ] && [ -n "$OPENCLAW_LATEST_VERSION" ] && [ "$OPENCLAW_ASSET_VERSION" = "$OPENCLAW_LATEST_VERSION" ]; then
-    echo "   OpenClaw 버전 동일($OPENCLAW_ASSET_VERSION), shim/underscore 인코딩 스킵"
-else
-    # 일부 npm 조합에서 _vendor/json-parser 경로를 요구하므로, 에셋 복사 후 호스트에서 shim을 다시 보장한다.
-    ensure_openclaw_json_parser_shim
-    # assets 패키징 전 _* 경로 인코딩
-    encode_openclaw_underscore_paths
+# openclaw 버전 파일 생성 (SetupManager에서 번들 버전 확인용)
+if [ -n "$OPENCLAW_ASSET_VERSION" ]; then
+    echo "$OPENCLAW_ASSET_VERSION" > "$ASSETS_DIR/openclaw-version.txt"
+    echo "   openclaw-version.txt: $OPENCLAW_ASSET_VERSION"
 fi
 
 if [ "$OPENCLAW_WAS_REBUILT" = "true" ] || [ ! -f "$OPENCLAW_CACHE_ARCHIVE" ]; then
@@ -807,11 +807,10 @@ if [ -f "$OLD_BUNDLE" ]; then
     rm -f "$OLD_BUNDLE"
 fi
 
-# 기존 OpenClaw tar 자산 삭제 (디렉토리 방식으로 이관)
-OLD_OPENCLAW_TAR="$ASSETS_DIR/openclaw-arm64.tar.gz.bin"
-if [ -f "$OLD_OPENCLAW_TAR" ]; then
-    echo "   구형 OpenClaw tar 삭제: openclaw-arm64.tar.gz.bin"
-    rm -f "$OLD_OPENCLAW_TAR"
+# 기존 OpenClaw 디렉토리 자산 삭제 (tar.gz 방식으로 이관)
+if [ -d "$ASSETS_DIR/openclaw" ]; then
+    echo "   구형 OpenClaw 디렉토리 삭제: openclaw/"
+    rm -rf "$ASSETS_DIR/openclaw"
 fi
 
 # 실행 권한 복원을 위한 매니페스트 생성
@@ -824,7 +823,7 @@ cat > "$EXEC_MANIFEST" <<'JSON'
       "usr/lib/git-core/git*",
       "usr/lib/git-core/scalar"
     ],
-    "openclaw": [
+    "openclaw-arm64.tar.gz.bin": [
       "usr/local/bin/openclaw"
     ]
   }
@@ -837,25 +836,7 @@ BUNDLE_FINGERPRINT="$ASSETS_DIR/bundle-fingerprint.json"
 if [ "$BUNDLE_FINGERPRINT_NEEDS_UPDATE" = "true" ] || [ ! -f "$BUNDLE_FINGERPRINT" ]; then
     NODE_SHA256="$(sha256sum "$ASSETS_DIR/node-arm64.tar.gz.bin" | awk '{print $1}')"
     TOOLS_SHA256="$(sha256sum "$ASSETS_DIR/system-tools-arm64.tar.gz.bin" | awk '{print $1}')"
-    if tar --help 2>/dev/null | grep -q -- '--sort='; then
-        OPENCLAW_SHA256="$(
-            tar -C "$ASSETS_DIR" \
-                --sort=name \
-                --mtime='UTC 1970-01-01' \
-                --owner=0 \
-                --group=0 \
-                --numeric-owner \
-                -cf - openclaw \
-                | sha256sum \
-                | awk '{print $1}'
-        )"
-    else
-        OPENCLAW_SHA256="$(
-            tar -C "$ASSETS_DIR" -cf - openclaw \
-                | sha256sum \
-                | awk '{print $1}'
-        )"
-    fi
+    OPENCLAW_SHA256="$(sha256sum "$OPENCLAW_TAR" | awk '{print $1}')"
     PLAYWRIGHT_SHA256="$(sha256sum "$ASSETS_DIR/playwright-chromium-arm64.tar.gz.bin" | awk '{print $1}')"
 
     cat > "$BUNDLE_FINGERPRINT" <<JSON
@@ -864,7 +845,7 @@ if [ "$BUNDLE_FINGERPRINT_NEEDS_UPDATE" = "true" ] || [ ! -f "$BUNDLE_FINGERPRIN
   "assets": {
     "node-arm64.tar.gz.bin": { "sha256": "$NODE_SHA256" },
     "system-tools-arm64.tar.gz.bin": { "sha256": "$TOOLS_SHA256" },
-    "openclaw": { "sha256": "$OPENCLAW_SHA256" },
+    "openclaw-arm64.tar.gz.bin": { "sha256": "$OPENCLAW_SHA256" },
     "playwright-chromium-arm64.tar.gz.bin": { "sha256": "$PLAYWRIGHT_SHA256" }
   }
 }
@@ -873,6 +854,10 @@ JSON
 else
     echo "   bundle-fingerprint.json 유지 (번들 변경 없음)"
 fi
+
+# 모델 카탈로그 JSON 생성 (모델 선택 성능 최적화)
+echo "모델 카탈로그 생성 중..."
+"$SCRIPT_DIR/generate-model-catalog.sh"
 
 echo ""
 echo "============================================"

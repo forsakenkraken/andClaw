@@ -517,6 +517,8 @@ class ProcessManager(
             try {
                 // 패치 파일이 없으면 생성
                 ensurePatchFile()
+                // .profile에 누락된 환경변수 보충 + 캐시 디렉토리 보장 (기존 사용자 대응)
+                ensureProfileEnvVars()
                 ensureStartupAttemptStillValid()
 
                 val survivorPidAlive = survivorMetadata?.pid?.let { pid ->
@@ -586,6 +588,8 @@ class ProcessManager(
                     put("PATH", "/usr/local/bin:/usr/bin:/bin")
                     put("LANG", "C.UTF-8")
                     put("UV_USE_IO_URING", "0")
+                    put("OPENCLAW_NO_RESPAWN", "1")
+                    put("OPENCLAW_DISABLE_BONJOUR", "1")
                     put("PLAYWRIGHT_BROWSERS_PATH", "/root/.cache/ms-playwright")
 
                     if (apiProvider == "github-copilot") {
@@ -2016,10 +2020,38 @@ class ProcessManager(
         }
     }
 
+    /**
+     * 기존 사용자의 .profile에 누락된 환경변수를 추가하고,
+     * 필요한 디렉토리를 생성한다.
+     */
+    private fun ensureProfileEnvVars() {
+        val profileFile = File(prootManager.rootfsDir, "root/.profile")
+        if (!profileFile.exists()) return
+        val content = profileFile.readText()
+        // NODE_COMPILE_CACHE 제거 (proot ptrace 오버헤드로 오히려 성능 저하)
+        if (content.contains("NODE_COMPILE_CACHE")) {
+            val cleaned = content.lines()
+                .filterNot { it.contains("NODE_COMPILE_CACHE") }
+                .joinToString("\n")
+            profileFile.writeText(cleaned)
+        }
+        val appends = buildString {
+            if (!content.contains("OPENCLAW_NO_RESPAWN")) {
+                appendLine("export OPENCLAW_NO_RESPAWN=1")
+            }
+        }
+        if (appends.isNotBlank()) {
+            profileFile.appendText(appends)
+        }
+    }
+
     private fun ensurePatchFile() {
         val patchFile = File(prootManager.rootfsDir, "root/.openclaw-patch.js")
         val needsUpdate = !patchFile.exists() ||
-            !patchFile.readText().contains("uncaughtException")
+            !patchFile.readText().contains("uncaughtException") ||
+            !patchFile.readText().contains("EAFNOSUPPORT") ||
+            !patchFile.readText().contains("openrouter.ai/api/v1/models") ||
+            patchFile.readText().contains("_cpSpawn")
         if (needsUpdate) {
             addLog("[andClaw] Creating Node.js compatibility patch...")
             patchFile.writeText(buildString {
@@ -2032,6 +2064,31 @@ class ProcessManager(
                 appendLine("  console.error('[openclaw] Uncaught exception:', err);")
                 appendLine("  process.exit(1);")
                 appendLine("});")
+                appendLine()
+                // Block IPv6 listen in proot — dual-stack binding (::1) breaks
+                // IPv4 127.0.0.1 connectivity on Android/proot.
+                appendLine("var _netListen = require('net').Server.prototype.listen;")
+                appendLine("require('net').Server.prototype.listen = function(port, host) {")
+                appendLine("  if (typeof host === 'string' && (host === '::1' || host === '::')) {")
+                appendLine("    var self = this;")
+                appendLine("    var err = new Error('EAFNOSUPPORT: IPv6 disabled in proot');")
+                appendLine("    err.code = 'EAFNOSUPPORT';")
+                appendLine("    process.nextTick(function() { self.emit('error', err); });")
+                appendLine("    return this;")
+                appendLine("  }")
+                appendLine("  return _netListen.apply(this, arguments);")
+                appendLine("};")
+                appendLine()
+                // Skip OpenRouter pricing fetch at startup — blocks event loop
+                // for 15s on proot due to network latency + ptrace overhead.
+                appendLine("var _origFetch = globalThis.fetch;")
+                appendLine("globalThis.fetch = function(url, opts) {")
+                appendLine("  if (typeof url === 'string' && url.includes('openrouter.ai/api/v1/models')) {")
+                appendLine("    return Promise.resolve(new Response(JSON.stringify({data:[]}),")
+                appendLine("      {status:200,headers:{'Content-Type':'application/json'}}));")
+                appendLine("  }")
+                appendLine("  return _origFetch.apply(this, arguments);")
+                appendLine("};")
                 appendLine()
                 appendLine("const os = require('os');")
                 appendLine("const _ni = os.networkInterfaces;")
@@ -2113,13 +2170,26 @@ class ProcessManager(
             !lineLower.contains("already listening")
         ) {
             gatewayUsesTls = lineLower.contains("wss://")
+            // 서버 포트가 열렸지만 아직 startup 작업 진행 중 — dashboardReady는 false 유지.
+            // Browser control listening 로그가 나오면 완전히 RUNNING으로 전환.
+            if (_gatewayState.value.status != GatewayStatus.RUNNING) {
+                _gatewayState.value = _gatewayState.value.copy(
+                    status = GatewayStatus.RUNNING,
+                    dashboardReady = false,
+                )
+                addLog("[andClaw] Gateway port open, waiting for full startup...")
+            }
+            startPairingObserver()
+        }
+
+        // Browser control 서버가 준비되면 startup 완전 완료
+        if (lineLower.contains("browser control listening") ||
+            lineLower.contains("browser/server") && lineLower.contains("listening")) {
             clearStartupAttempt()
             _gatewayState.value = _gatewayState.value.copy(
-                status = GatewayStatus.RUNNING,
                 dashboardReady = true,
             )
             addLog("[andClaw] Gateway is ready!")
-            startPairingObserver()
         }
     }
 

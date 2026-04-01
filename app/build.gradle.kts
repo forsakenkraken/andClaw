@@ -37,8 +37,8 @@ android {
         applicationId = "com.coderred.andclaw"
         minSdk = 26
         targetSdk = 35
-        versionCode = 142
-        versionName = "1.2.28"
+        versionCode = 169
+        versionName = "1.2.46"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -109,8 +109,8 @@ android {
 
     androidResources {
         noCompress += listOf("tar.gz", "bin")
-        // OpenClaw node_modules 내부 _vendor 디렉토리가 assets 패키징에서 누락되지 않도록 명시
-        ignoreAssetsPattern = "!.svn:!.git:!*.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!_*:!*~"
+        // AAPT 기본 무시 패턴 재정의 (_* 파일이 무시되지 않도록)
+        ignoreAssetsPattern = "!.svn:!.git:!*.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~"
     }
 
     // proot 바이너리를 nativeLibraryDir에 추출하기 위해 필수

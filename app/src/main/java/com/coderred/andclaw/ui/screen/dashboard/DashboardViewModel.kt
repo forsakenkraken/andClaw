@@ -809,7 +809,7 @@ internal suspend fun resolveDashboardUrl(
         if (!token.isNullOrBlank()) {
             val encodedToken = URLEncoder.encode(token, StandardCharsets.UTF_8.toString())
             val scheme = if (usesTls) "https" else "http"
-            return "$scheme://localhost:18789/#token=$encodedToken"
+            return "$scheme://127.0.0.1:18789/#token=$encodedToken"
         }
         if (index < attempts - 1) {
             delay(delayMs)

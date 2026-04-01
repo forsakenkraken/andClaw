@@ -230,6 +230,7 @@ class GatewayWsClient(
     }
 
     private fun probeGatewayHealthViaHttp(timeoutMs: Long): Boolean {
+        val token = readGatewayAuthToken()
         val client = OkHttpClient.Builder()
             .connectTimeout(timeoutMs, TimeUnit.MILLISECONDS)
             .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
@@ -237,6 +238,11 @@ class GatewayWsClient(
             .build()
         val request = Request.Builder()
             .url(if (usesTls) "https://127.0.0.1:18789/health" else "http://127.0.0.1:18789/health")
+            .apply {
+                if (!token.isNullOrBlank()) {
+                    addHeader("Authorization", "Bearer $token")
+                }
+            }
             .get()
             .build()
         return try {
@@ -246,6 +252,18 @@ class GatewayWsClient(
         } catch (_: Exception) {
             false
         }
+    }
+
+    private fun readGatewayAuthToken(): String? {
+        return runCatching {
+            val configFile = java.io.File(prootManager.rootfsDir, "root/.openclaw/openclaw.json")
+            if (!configFile.exists()) return null
+            val json = org.json.JSONObject(configFile.readText())
+            json.optJSONObject("gateway")
+                ?.optJSONObject("auth")
+                ?.optString("token", "")
+                ?.takeIf { it.isNotBlank() }
+        }.getOrNull()
     }
 
     /**
