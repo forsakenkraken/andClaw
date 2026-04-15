@@ -148,6 +148,40 @@ No se envía a nuestros servidores.</string>
 
     <!-- Tools -->
     <string name="settings_section_tools">Herramientas</string>
+    <string name="settings_section_advanced_users">Usuarios avanzados</string>
+    <string name="settings_execution_runtime_title">Runtime de ejecución</string>
+    <string name="settings_execution_runtime_desc">Cámbialo solo si el runtime predeterminado tiene problemas de compatibilidad.</string>
+    <string name="settings_execution_runtime_dialog_title">Runtime de ejecución</string>
+    <string name="settings_execution_runtime_proroot">proroot (inicio rápido)</string>
+    <string name="settings_execution_runtime_proot">proot (estabilidad)</string>
+    <string name="settings_openclaw_config_editor_entry">Editor de configuración de OpenClaw</string>
+    <string name="settings_openclaw_config_editor_entry_desc">Inspecciona, edita y restaura copias de seguridad de openclaw.json.</string>
+    <string name="settings_openclaw_config_editor_title">Editor de configuración de OpenClaw</string>
+    <string name="settings_openclaw_config_editor_save">Guardar</string>
+    <string name="settings_openclaw_config_editor_current_source">Fuente actual</string>
+    <string name="settings_openclaw_config_editor_backups">Copias de seguridad</string>
+    <string name="settings_openclaw_config_editor_no_backups">No hay copias de seguridad disponibles</string>
+    <string name="settings_openclaw_config_editor_missing">No se encontró openclaw.json. Puedes crear un archivo nuevo.</string>
+    <string name="settings_openclaw_config_editor_save_failed">Error del editor de configuración de OpenClaw</string>
+    <string name="settings_openclaw_extension_prune">Eliminar extensiones OpenClaw no utilizadas</string>
+    <string name="settings_openclaw_extension_prune_desc">Úsalo solo si elegiste proot (estabilidad) y el gateway se queda atascado al iniciar, o si OpenClaw empieza a responder mucho más lento de lo normal.</string>
+    <string name="settings_openclaw_extension_prune_running">Eliminando extensiones OpenClaw no utilizadas…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">¿Eliminar extensiones OpenClaw no utilizadas?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">Úsalo solo si elegiste proot (estabilidad) y el gateway se queda atascado al iniciar, o si OpenClaw empieza a responder mucho más lento de lo normal. Los elementos que ya no existan se omitirán automáticamente.</string>
+    <string name="settings_openclaw_extension_prune_done">Extensiones OpenClaw no utilizadas eliminadas</string>
+    <string name="settings_openclaw_extension_prune_failed">No se pudieron eliminar las extensiones OpenClaw no utilizadas</string>
+    <string name="settings_openclaw_extension_prune_failed_message">No se pudieron eliminar las extensiones de OpenClaw preseleccionadas.</string>
+    <string name="settings_openclaw_extension_prune_result_partial">Eliminadas: %1$d
+Ya ausentes: %2$d
+Fallidas: %3$d
+No se pudieron quitar algunos elementos.</string>
+    <string name="settings_openclaw_extension_prune_result_summary">Eliminadas: %1$d
+Ya ausentes: %2$d
+Fallidas: %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">Eliminar</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">Disponible solo cuando se selecciona proot (estabilidad).</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">Cargar esta copia de seguridad reemplazará el JSON actual del editor. La copia no se aplica realmente hasta que guardes.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">¿Reemplazar el borrador actual?</string>
     <string name="settings_brave_search_key">Clave API de Brave Search</string>
     <string name="settings_brave_search_desc">Habilita la búsqueda web para el agente de IA. Opcional — dejar vacío para desactivar.</string>
     <string name="settings_brave_search_optional">No configurado (opcional)</string>
@@ -322,7 +356,6 @@ No cierre ni fuerce la detención de la app mientras la recuperación esté en c
     <string name="settings_transfer_export_success">Exportación de transferencia completada.</string>
     <string name="settings_transfer_share_failed">No se pudo compartir el archivo de transferencia.</string>
 </resources>
-
 
 
 

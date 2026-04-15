@@ -45,12 +45,14 @@ import com.coderred.andclaw.data.hasGitHubCopilotEnvAuth
 import com.coderred.andclaw.data.hasOpenClawModelsStatusAuth
 import com.coderred.andclaw.data.hasOpenClawSecretRef
 import com.coderred.andclaw.proroot.BundleUpdateOutcome
+import com.coderred.andclaw.proroot.ExecutionRuntime
 import com.coderred.andclaw.proroot.GatewayWsClient
 import com.coderred.andclaw.proroot.OpenClawModelCatalogReader
 import com.coderred.andclaw.proroot.ProcessManager
 import com.coderred.andclaw.proroot.WhatsAppLoginCoordinator
 import com.coderred.andclaw.service.GatewayService
 import com.coderred.andclaw.ui.screen.dashboard.WhatsAppQrState
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
@@ -61,6 +63,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -82,10 +85,14 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 class SettingsViewModel(
     application: Application,
     private val transferManager: SettingsTransferManager = DefaultSettingsTransferManager(),
+    private val openClawConfigEditorManagerFactory: (File) -> OpenClawConfigEditorManager =
+        { rootfsDir -> OpenClawConfigEditorManager(rootfsDir) },
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : AndroidViewModel(application) {
 
     constructor(application: Application) : this(application, DefaultSettingsTransferManager())
@@ -101,6 +108,11 @@ class SettingsViewModel(
     )
 
     data class OpenClawUpdateResult(
+        val success: Boolean,
+        val output: String,
+    )
+
+    data class OpenClawExtensionPruneResult(
         val success: Boolean,
         val output: String,
     )
@@ -165,6 +177,28 @@ class SettingsViewModel(
         val importAction: TransferActionUiState = TransferActionUiState(),
     )
 
+    data class OpenClawConfigEditorUiState(
+        val text: String = "",
+        val backups: List<String> = emptyList(),
+        val sourceLabel: String? = null,
+        val baselineText: String = "",
+        val isConfigMissing: Boolean = false,
+        val isLoading: Boolean = false,
+        val isSaving: Boolean = false,
+        val errorMessage: String? = null,
+    )
+
+    private data class OpenClawConfigEditorLoadData(
+        val text: String,
+        val backups: List<String>,
+        val isConfigMissing: Boolean,
+    )
+
+    enum class OpenClawConfigEditorNavigation {
+        None,
+        NavigateDashboard,
+    }
+
     companion object {
         private const val TAG = "AndClawCodexAuth"
         private const val GITHUB_COPILOT_CLIENT_ID = "Iv1.b507a08c87ecfe98"
@@ -193,6 +227,7 @@ class SettingsViewModel(
         private const val MIN_TRANSFER_PASSWORD_LENGTH = 4
         private const val TRANSFER_IMPORT_VERIFY_TIMEOUT_MS = 20_000L
         private const val TRANSFER_IMPORT_VERIFY_POLL_MS = 250L
+        private const val OPENCLAW_CONFIG_FILE_NAME = "openclaw.json"
 
     }
     private val prefs = (application as AndClawApp).preferencesManager
@@ -208,6 +243,9 @@ class SettingsViewModel(
 
     val chargeOnlyMode: StateFlow<Boolean> = prefs.chargeOnlyMode
         .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    val executionRuntime: StateFlow<String> = prefs.executionRuntime
+        .stateIn(viewModelScope, SharingStarted.Eagerly, ExecutionRuntime.PROROOT.storageValue)
 
     val apiProvider: StateFlow<String> = prefs.apiProvider
         .stateIn(viewModelScope, SharingStarted.Eagerly, "openrouter")
@@ -354,16 +392,29 @@ class SettingsViewModel(
     val isOpenClawUpdateRunning: StateFlow<Boolean> = _isOpenClawUpdateRunning.asStateFlow()
     private val _openClawUpdateResult = MutableStateFlow<OpenClawUpdateResult?>(null)
     val openClawUpdateResult: StateFlow<OpenClawUpdateResult?> = _openClawUpdateResult.asStateFlow()
+    private val _isOpenClawExtensionPruneRunning = MutableStateFlow(false)
+    val isOpenClawExtensionPruneRunning: StateFlow<Boolean> = _isOpenClawExtensionPruneRunning.asStateFlow()
+    private val _openClawExtensionPruneResult = MutableStateFlow<OpenClawExtensionPruneResult?>(null)
+    val openClawExtensionPruneResult: StateFlow<OpenClawExtensionPruneResult?> = _openClawExtensionPruneResult.asStateFlow()
     private val _isOpenClawUpdateAvailable = MutableStateFlow(false)
     val isOpenClawUpdateAvailable: StateFlow<Boolean> = _isOpenClawUpdateAvailable.asStateFlow()
     private val _installedOpenClawVersion = MutableStateFlow<String?>(null)
     val installedOpenClawVersion: StateFlow<String?> = _installedOpenClawVersion.asStateFlow()
     private val _bundledOpenClawVersion = MutableStateFlow<String?>(null)
     val bundledOpenClawVersion: StateFlow<String?> = _bundledOpenClawVersion.asStateFlow()
+    private val _runtimeRestartHintNonce = MutableStateFlow(0L)
+    val runtimeRestartHintNonce: StateFlow<Long> = _runtimeRestartHintNonce.asStateFlow()
     private val _bugReportUiState = MutableStateFlow(BugReportUiState())
     val bugReportUiState: StateFlow<BugReportUiState> = _bugReportUiState.asStateFlow()
     private val _transferUiState = MutableStateFlow(TransferUiState())
     val transferUiState: StateFlow<TransferUiState> = _transferUiState.asStateFlow()
+    private val _openClawConfigEditorState = MutableStateFlow(OpenClawConfigEditorUiState())
+    val openClawConfigEditorState: StateFlow<OpenClawConfigEditorUiState> = _openClawConfigEditorState.asStateFlow()
+    private val _openClawConfigEditorNavigation = MutableStateFlow(OpenClawConfigEditorNavigation.None)
+    val openClawConfigEditorNavigation: StateFlow<OpenClawConfigEditorNavigation> =
+        _openClawConfigEditorNavigation.asStateFlow()
+    private val openClawConfigEditorActionToken = AtomicLong(0L)
+    private val openClawConfigEditorDraftVersion = AtomicLong(0L)
     private val codexAuthRunning = AtomicBoolean(false)
     private val gitHubCopilotAuthRunning = AtomicBoolean(false)
     private var gitHubCopilotAuthJob: Job? = null
@@ -383,7 +434,7 @@ class SettingsViewModel(
     private var pendingTransferImportArtifact: File? = null
 
     init {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             prefs.backfillSelectedModelProviderIfMissing()
             val provider = prefs.apiProvider.first()
             if (provider == "openai-codex") {
@@ -392,7 +443,7 @@ class SettingsViewModel(
                 refreshGitHubCopilotAuthStatusInternal()
             }
         }
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             // 게이트웨이가 아직 시작 중이면 RUNNING이 될 때까지 대기 후 조회
             if (processManager.gatewayState.value.status == GatewayStatus.STARTING) {
                 waitForGatewayStatus(GatewayStatus.RUNNING, timeoutMs = 30_000L)
@@ -424,6 +475,171 @@ class SettingsViewModel(
 
     fun setChargeOnlyMode(enabled: Boolean) {
         viewModelScope.launch { prefs.setChargeOnlyMode(enabled) }
+    }
+
+    fun setExecutionRuntime(runtime: String) {
+        viewModelScope.launch(ioDispatcher) {
+            val normalizedRuntime = ExecutionRuntime.fromStorageValue(runtime).storageValue
+            if (executionRuntime.value == normalizedRuntime) return@launch
+            prefs.setExecutionRuntime(normalizedRuntime)
+            _runtimeRestartHintNonce.value = System.currentTimeMillis()
+        }
+    }
+
+    fun loadOpenClawConfigEditor() {
+        val draftVersionAtStart = openClawConfigEditorDraftVersion.get()
+        val requestToken = beginOpenClawConfigEditorAction(isSaving = false) ?: return
+
+        viewModelScope.launch(ioDispatcher) {
+            runCatching {
+                createOpenClawConfigEditorManager().let { manager ->
+                    val currentText = manager.loadCurrentConfig()
+                    OpenClawConfigEditorLoadData(
+                        text = currentText.orEmpty(),
+                        backups = manager.listBackupConfigs().map { it.fileName },
+                        isConfigMissing = currentText == null,
+                    )
+                }
+            }.onSuccess { result ->
+                _openClawConfigEditorState.update { current ->
+                    if (!isCurrentOpenClawConfigEditorAction(requestToken)) {
+                        current
+                    } else if (openClawConfigEditorDraftVersion.get() != draftVersionAtStart) {
+                        current.copy(
+                            backups = result.backups,
+                            isLoading = false,
+                            errorMessage = null,
+                        )
+                    } else {
+                        current.copy(
+                            text = result.text,
+                            backups = result.backups,
+                            sourceLabel = if (result.isConfigMissing) null else OPENCLAW_CONFIG_FILE_NAME,
+                            baselineText = result.text,
+                            isConfigMissing = result.isConfigMissing,
+                            isLoading = false,
+                            errorMessage = null,
+                        )
+                    }
+                }
+            }.onFailure { throwable ->
+                _openClawConfigEditorState.update { current ->
+                    if (!isCurrentOpenClawConfigEditorAction(requestToken)) {
+                        current
+                    } else {
+                        current.copy(
+                            isLoading = false,
+                            errorMessage = throwable.message ?: "Failed to load OpenClaw config.",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun updateOpenClawConfigEditorText(value: String) {
+        openClawConfigEditorDraftVersion.incrementAndGet()
+        _openClawConfigEditorState.update { current ->
+            current.copy(
+                text = value,
+                errorMessage = null,
+            )
+        }
+    }
+
+    fun loadOpenClawConfigBackup(fileName: String) {
+        val draftVersionAtStart = openClawConfigEditorDraftVersion.get()
+        val requestToken = beginOpenClawConfigEditorAction(isSaving = false) ?: return
+
+        viewModelScope.launch(ioDispatcher) {
+            runCatching {
+                createOpenClawConfigEditorManager().loadBackup(fileName)
+            }.onSuccess { backupText ->
+                _openClawConfigEditorState.update { current ->
+                    if (!isCurrentOpenClawConfigEditorAction(requestToken)) {
+                        current
+                    } else if (openClawConfigEditorDraftVersion.get() != draftVersionAtStart) {
+                        current.copy(
+                            isLoading = false,
+                            errorMessage = null,
+                        )
+                    } else {
+                        current.copy(
+                            text = backupText,
+                            sourceLabel = fileName,
+                            baselineText = backupText,
+                            isConfigMissing = current.isConfigMissing,
+                            isLoading = false,
+                            errorMessage = null,
+                        )
+                    }
+                }
+            }.onFailure { throwable ->
+                _openClawConfigEditorState.update { current ->
+                    if (!isCurrentOpenClawConfigEditorAction(requestToken)) {
+                        current
+                    } else {
+                        current.copy(
+                            isLoading = false,
+                            errorMessage = throwable.message ?: "Failed to load OpenClaw backup.",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun saveOpenClawConfigEditor() {
+        val textSnapshot = openClawConfigEditorState.value.text
+        val requestToken = beginOpenClawConfigEditorAction(isSaving = true) ?: return
+        _openClawConfigEditorNavigation.update { OpenClawConfigEditorNavigation.None }
+
+        viewModelScope.launch(ioDispatcher) {
+            runCatching {
+                val manager = createOpenClawConfigEditorManager()
+                manager.saveConfig(textSnapshot)
+                val currentText = manager.loadCurrentConfig()
+                OpenClawConfigEditorLoadData(
+                    text = currentText.orEmpty(),
+                    backups = manager.listBackupConfigs().map { it.fileName },
+                    isConfigMissing = currentText == null,
+                )
+            }.onSuccess { result ->
+                _openClawConfigEditorState.update { current ->
+                    if (!isCurrentOpenClawConfigEditorAction(requestToken)) {
+                        current
+                    } else {
+                        current.copy(
+                            text = result.text,
+                            backups = result.backups,
+                            sourceLabel = if (result.isConfigMissing) null else OPENCLAW_CONFIG_FILE_NAME,
+                            baselineText = result.text,
+                            isConfigMissing = result.isConfigMissing,
+                            isSaving = false,
+                            errorMessage = null,
+                        )
+                    }
+                }
+                if (isCurrentOpenClawConfigEditorAction(requestToken)) {
+                    _openClawConfigEditorNavigation.update { OpenClawConfigEditorNavigation.NavigateDashboard }
+                }
+            }.onFailure { throwable ->
+                _openClawConfigEditorState.update { current ->
+                    if (!isCurrentOpenClawConfigEditorAction(requestToken)) {
+                        current
+                    } else {
+                        current.copy(
+                            isSaving = false,
+                            errorMessage = throwable.message ?: "Failed to save OpenClaw config.",
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    fun consumeOpenClawConfigEditorNavigation() {
+        _openClawConfigEditorNavigation.update { OpenClawConfigEditorNavigation.None }
     }
 
     fun onVersionInfoTapped() {
@@ -1253,6 +1469,58 @@ class SettingsViewModel(
         _recoveryInstallResult.value = null
     }
 
+    fun runOpenClawExtensionPrune() {
+        if (
+            _isOpenClawExtensionPruneRunning.value ||
+            _isDoctorFixRunning.value ||
+            _isRecoveryInstallRunning.value ||
+            _isOpenClawUpdateRunning.value
+        ) return
+        if (executionRuntime.value != ExecutionRuntime.PROOT.storageValue) {
+            _openClawExtensionPruneResult.value = OpenClawExtensionPruneResult(
+                success = false,
+                output = appString(R.string.settings_openclaw_extension_prune_requires_proot),
+            )
+            return
+        }
+        _isOpenClawExtensionPruneRunning.value = true
+        _openClawExtensionPruneResult.value = null
+        viewModelScope.launch(ioDispatcher) {
+            try {
+                val result = createOpenClawConfigEditorManager().pruneBlacklistedExtensions()
+                val removed = result.removedCount
+                val missing = result.missingCount
+                val failed = result.failedCount
+                val success = failed == 0
+                val outputResId = if (success) {
+                    R.string.settings_openclaw_extension_prune_result_summary
+                } else {
+                    R.string.settings_openclaw_extension_prune_result_partial
+                }
+                _openClawExtensionPruneResult.value = OpenClawExtensionPruneResult(
+                    success = success,
+                    output = appString(
+                        outputResId,
+                        removed,
+                        missing,
+                        failed,
+                    ),
+                )
+            } catch (error: Exception) {
+                _openClawExtensionPruneResult.value = OpenClawExtensionPruneResult(
+                    success = false,
+                    output = error.message ?: appString(R.string.settings_openclaw_extension_prune_failed_message),
+                )
+            } finally {
+                _isOpenClawExtensionPruneRunning.value = false
+            }
+        }
+    }
+
+    fun consumeOpenClawExtensionPruneResult() {
+        _openClawExtensionPruneResult.value = null
+    }
+
     fun setTransferExportPassword(password: String) {
         _transferUiState.value = _transferUiState.value.copy(
             passwords = _transferUiState.value.passwords.copy(exportPassword = password),
@@ -1608,6 +1876,8 @@ class SettingsViewModel(
     }
 
     private fun appString(resId: Int): String = getApplication<Application>().getString(resId)
+
+    private fun appString(resId: Int, vararg args: Any): String = getApplication<Application>().getString(resId, *args)
 
     private fun isTransferBlockedByMaintenance(): Boolean {
         return _isDoctorFixRunning.value ||
@@ -3006,6 +3276,32 @@ class SettingsViewModel(
             val payload = String(Base64.decode(parts[1], Base64.URL_SAFE or Base64.NO_WRAP))
             JSONObject(payload)
         }.getOrNull()
+    }
+
+    private fun createOpenClawConfigEditorManager(): OpenClawConfigEditorManager {
+        return openClawConfigEditorManagerFactory(prorootManager.rootfsDir)
+    }
+
+    private fun beginOpenClawConfigEditorAction(isSaving: Boolean): Long? {
+        while (true) {
+            val current = _openClawConfigEditorState.value
+            if (current.isLoading || current.isSaving) {
+                return null
+            }
+
+            val updated = current.copy(
+                isLoading = !isSaving,
+                isSaving = isSaving,
+                errorMessage = null,
+            )
+            if (_openClawConfigEditorState.compareAndSet(current, updated)) {
+                return openClawConfigEditorActionToken.incrementAndGet()
+            }
+        }
+    }
+
+    private fun isCurrentOpenClawConfigEditorAction(requestToken: Long): Boolean {
+        return openClawConfigEditorActionToken.get() == requestToken
     }
 
     private fun writeCodexOAuthCredentials(token: OAuthTokenResult, accountId: String) {

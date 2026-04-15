@@ -91,6 +91,7 @@ import com.coderred.andclaw.data.SetupStep
 import com.coderred.andclaw.data.BugReportEmailMetadata
 import com.coderred.andclaw.data.BugReportEmailSummary
 import com.coderred.andclaw.data.PreferencesManager
+import com.coderred.andclaw.proroot.ExecutionRuntime
 import com.coderred.andclaw.ui.component.DefaultModelDialogOption
 import com.coderred.andclaw.ui.component.DefaultModelSelectionDialog
 import com.coderred.andclaw.ui.component.KeepScreenOnEffect
@@ -109,12 +110,14 @@ import kotlinx.coroutines.isActive
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
+    onOpenClawConfigEditor: () -> Unit,
     initialApiProvider: String? = null,
     openApiKeyDialogOnLaunch: Boolean = false,
     viewModel: SettingsViewModel = viewModel(),
 ) {
     val autoStartOnBoot by viewModel.autoStartOnBoot.collectAsState()
     val chargeOnlyMode by viewModel.chargeOnlyMode.collectAsState()
+    val executionRuntime by viewModel.executionRuntime.collectAsState()
     val apiProvider by viewModel.apiProvider.collectAsState()
     val apiKey by viewModel.apiKey.collectAsState()
     val openAiCompatibleBaseUrl by viewModel.openAiCompatibleBaseUrl.collectAsState()
@@ -142,6 +145,8 @@ fun SettingsScreen(
     val memorySearchApiKey by viewModel.memorySearchApiKey.collectAsState()
     val isDoctorFixRunning by viewModel.isDoctorFixRunning.collectAsState()
     val doctorFixResult by viewModel.doctorFixResult.collectAsState()
+    val isOpenClawExtensionPruneRunning by viewModel.isOpenClawExtensionPruneRunning.collectAsState()
+    val openClawExtensionPruneResult by viewModel.openClawExtensionPruneResult.collectAsState()
     val isRecoveryInstallRunning by viewModel.isRecoveryInstallRunning.collectAsState()
     val recoveryInstallResult by viewModel.recoveryInstallResult.collectAsState()
     val isOpenClawUpdateRunning by viewModel.isOpenClawUpdateRunning.collectAsState()
@@ -149,6 +154,7 @@ fun SettingsScreen(
     val isOpenClawUpdateAvailable by viewModel.isOpenClawUpdateAvailable.collectAsState()
     val installedOpenClawVersion by viewModel.installedOpenClawVersion.collectAsState()
     val bundledOpenClawVersion by viewModel.bundledOpenClawVersion.collectAsState()
+    val runtimeRestartHintNonce by viewModel.runtimeRestartHintNonce.collectAsState()
     val setupState by viewModel.setupState.collectAsState()
     val whatsappQrState by viewModel.whatsappQrState.collectAsState()
     val isWhatsAppLinked by viewModel.isWhatsAppLinked.collectAsState()
@@ -208,6 +214,12 @@ fun SettingsScreen(
         "local" -> stringResource(R.string.settings_memory_search_provider_local)
         else -> stringResource(R.string.settings_memory_search_provider_auto)
     }
+    val executionRuntimeDisplay = formatExecutionRuntimeLabel(
+        runtime = executionRuntime,
+        prorootLabel = stringResource(R.string.settings_execution_runtime_proroot),
+        prootLabel = stringResource(R.string.settings_execution_runtime_proot),
+    )
+    val canRunExtensionPrune = executionRuntime == ExecutionRuntime.PROOT.storageValue
     val settingsTabs = listOf(
         stringResource(R.string.settings_section_gateway),
         stringResource(R.string.settings_tab_model),
@@ -227,6 +239,8 @@ fun SettingsScreen(
     var showBraveKeyDialog by remember { mutableStateOf(false) }
     var showMemorySearchProviderDialog by remember { mutableStateOf(false) }
     var showMemorySearchApiKeyDialog by remember { mutableStateOf(false) }
+    var showExecutionRuntimeDialog by remember { mutableStateOf(false) }
+    var showExtensionPruneConfirmDialog by remember { mutableStateOf(false) }
     var showOssLicensesDialog by remember { mutableStateOf(false) }
     var showRecoveryInstallConfirmDialog by remember { mutableStateOf(false) }
     var showOpenClawUpdateConfirmDialog by remember { mutableStateOf(false) }
@@ -244,6 +258,7 @@ fun SettingsScreen(
         isDoctorFixRunning ||
             isRecoveryInstallRunning ||
             isOpenClawUpdateRunning ||
+            isOpenClawExtensionPruneRunning ||
             isCodexAuthInProgress ||
             isGitHubCopilotAuthInProgress
     val openClawVersionInfoText = if (!installedOpenClawVersion.isNullOrBlank() && !bundledOpenClawVersion.isNullOrBlank()) {
@@ -261,6 +276,12 @@ fun SettingsScreen(
         }
     } else {
         null
+    }
+
+    LaunchedEffect(runtimeRestartHintNonce) {
+        if (runtimeRestartHintNonce > 0L) {
+            showRestartHint = true
+        }
     }
     val ossLicensesText = remember {
         runCatching {
@@ -760,6 +781,59 @@ fun SettingsScreen(
                             },
                             enabled = !isMaintenanceBusy,
                             onClick = { viewModel.runOpenClawDoctorFix() },
+                        )
+                    }
+                }
+
+                SectionHeader(
+                    title = stringResource(R.string.settings_section_advanced_users),
+                    icon = Icons.Default.Info,
+                )
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    ),
+                ) {
+                    Column {
+                        SettingClickableRow(
+                            title = stringResource(R.string.settings_execution_runtime_title),
+                            value = executionRuntimeDisplay,
+                            onClick = { showExecutionRuntimeDialog = true },
+                            valueMaxLines = 2,
+                        )
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        )
+
+                        SettingClickableRow(
+                            title = stringResource(R.string.settings_openclaw_config_editor_entry),
+                            value = stringResource(R.string.settings_openclaw_config_editor_entry_desc),
+                            onClick = onOpenClawConfigEditor,
+                            valueMaxLines = 2,
+                        )
+
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        )
+
+                        SettingClickableRow(
+                            title = stringResource(R.string.settings_openclaw_extension_prune),
+                            value = if (isOpenClawExtensionPruneRunning) {
+                                stringResource(R.string.settings_openclaw_extension_prune_running)
+                            } else if (!canRunExtensionPrune) {
+                                stringResource(R.string.settings_openclaw_extension_prune_requires_proot)
+                            } else {
+                                stringResource(R.string.settings_openclaw_extension_prune_desc)
+                            },
+                            enabled = !isMaintenanceBusy && canRunExtensionPrune,
+                            onClick = { showExtensionPruneConfirmDialog = true },
+                            valueMaxLines = 3,
                         )
                     }
                 }
@@ -1263,6 +1337,81 @@ fun SettingsScreen(
         )
     }
 
+    if (showExecutionRuntimeDialog) {
+        AlertDialog(
+            onDismissRequest = { showExecutionRuntimeDialog = false },
+            shape = RoundedCornerShape(24.dp),
+            title = { Text(stringResource(R.string.settings_execution_runtime_dialog_title)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = stringResource(R.string.settings_execution_runtime_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    listOf(
+                        ExecutionRuntime.PROROOT.storageValue to stringResource(R.string.settings_execution_runtime_proroot),
+                        ExecutionRuntime.PROOT.storageValue to stringResource(R.string.settings_execution_runtime_proot),
+                    ).forEach { (runtimeValue, label) ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setExecutionRuntime(runtimeValue)
+                                    showExecutionRuntimeDialog = false
+                                }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = executionRuntime == runtimeValue,
+                                onClick = {
+                                    viewModel.setExecutionRuntime(runtimeValue)
+                                    showExecutionRuntimeDialog = false
+                                },
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(text = label, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showExecutionRuntimeDialog = false }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        )
+    }
+
+    if (showExtensionPruneConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showExtensionPruneConfirmDialog = false },
+            shape = RoundedCornerShape(24.dp),
+            title = { Text(stringResource(R.string.settings_openclaw_extension_prune_confirm_title)) },
+            text = {
+                Text(
+                    text = stringResource(R.string.settings_openclaw_extension_prune_confirm_message),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showExtensionPruneConfirmDialog = false
+                        viewModel.runOpenClawExtensionPrune()
+                    },
+                ) {
+                    Text(stringResource(R.string.settings_openclaw_extension_prune_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showExtensionPruneConfirmDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
+
     if (showOpenClawUpdateConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showOpenClawUpdateConfirmDialog = false },
@@ -1643,6 +1792,62 @@ fun SettingsScreen(
                 }
             },
         )
+    }
+
+    if (openClawExtensionPruneResult != null) {
+        AlertDialog(
+            onDismissRequest = { viewModel.consumeOpenClawExtensionPruneResult() },
+            shape = RoundedCornerShape(24.dp),
+            title = {
+                Text(
+                    if (openClawExtensionPruneResult?.success == true) {
+                        stringResource(R.string.settings_openclaw_extension_prune_done)
+                    } else {
+                        stringResource(R.string.settings_openclaw_extension_prune_failed)
+                    },
+                )
+            },
+            text = {
+                Text(
+                    text = openClawExtensionPruneResult?.output.orEmpty(),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.consumeOpenClawExtensionPruneResult() }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        )
+    }
+
+    if (isOpenClawExtensionPruneRunning) {
+        Dialog(
+            onDismissRequest = {},
+            properties = DialogProperties(
+                dismissOnBackPress = false,
+                dismissOnClickOutside = false,
+            ),
+        ) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface,
+                ),
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    CircularProgressIndicator()
+                    Text(
+                        text = stringResource(R.string.settings_openclaw_extension_prune_running),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+        }
     }
 
     if (recoveryInstallResult != null) {
@@ -3059,6 +3264,17 @@ private fun parseDiscordGuildAllowlist(raw: String): List<String> {
         .mapNotNull { normalizeDiscordGuildAllowlistEntry(it) }
         .distinct()
         .toList()
+}
+
+internal fun formatExecutionRuntimeLabel(
+    runtime: String,
+    prorootLabel: String,
+    prootLabel: String,
+): String {
+    return when (ExecutionRuntime.fromStorageValue(runtime)) {
+        ExecutionRuntime.PROOT -> prootLabel
+        ExecutionRuntime.PROROOT -> prorootLabel
+    }
 }
 
 private fun normalizeDiscordGuildAllowlistEntry(value: String): String? {

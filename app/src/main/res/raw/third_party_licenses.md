@@ -12,7 +12,18 @@ Included Components (Key Runtime/Binary)
   - License: LGPL-2.1 (https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html)
   - Source: https://sourceware.org/glibc/
 
-2) openclaw (bundled CLI assets)
+2) proot / libtalloc (legacy compatibility runtime)
+- Upstream:
+  - https://github.com/termux/proot
+  - https://github.com/samba-team/samba/tree/master/lib/talloc
+- License:
+  - proot: GPL-2.0
+  - libtalloc: LGPL-3.0-or-later
+- Distribution note:
+  - This app may redistribute the legacy Termux proot compatibility runtime as libproot.so, libproot-loader.so, libproot-loader32.so, and libtalloc.so.
+  - If these binaries are included in APK/AAB artifacts, keep corresponding source access and license notices available.
+
+3) openclaw (bundled CLI assets)
 - Upstream:
   - https://www.npmjs.com/package/openclaw
 - License: MIT
@@ -21,19 +32,19 @@ Included Components (Key Runtime/Binary)
   - Keep MIT notice and provide source access link for distributed app sources.
   - Public source repository for this app: https://github.com/coderredlab/andClaw
 
-3) Node.js (bundled runtime)
+4) Node.js (bundled runtime)
 - Upstream: https://nodejs.org/
 - License: MIT
 - Distribution note:
   - Bundled as node-arm64.tar.gz.bin in install_time_assets.
 
-4) Playwright Chromium headless_shell (bundled browser)
+5) Playwright Chromium headless_shell (bundled browser)
 - Upstream: https://playwright.dev/
 - License: Apache-2.0 (Playwright), Chromium (BSD-style)
 - Distribution note:
   - Bundled as playwright-chromium-arm64.tar.gz.bin in install_time_assets.
 
-5) OpenClaw bundled dependencies (selected copyleft-sensitive)
+6) OpenClaw bundled dependencies (selected copyleft-sensitive)
 - The bundled OpenClaw asset tree includes many transitive packages.
 - Current bundled tree includes packages with additional obligations:
   - @whiskeysockets/libsignal-node

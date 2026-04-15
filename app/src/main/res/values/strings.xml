@@ -167,6 +167,40 @@ Do not close or force-stop the app while recovery is in progress.</string>
 
     <!-- Tools -->
     <string name="settings_section_tools">Tools</string>
+    <string name="settings_section_advanced_users">Advanced users</string>
+    <string name="settings_execution_runtime_title">Execution runtime</string>
+    <string name="settings_execution_runtime_desc">Change this only if the default runtime has compatibility issues.</string>
+    <string name="settings_execution_runtime_dialog_title">Execution runtime</string>
+    <string name="settings_execution_runtime_proroot">proroot (fast startup)</string>
+    <string name="settings_execution_runtime_proot">proot (stability)</string>
+    <string name="settings_openclaw_config_editor_entry">OpenClaw config editor</string>
+    <string name="settings_openclaw_config_editor_entry_desc">Inspect, edit, and restore openclaw.json backups.</string>
+    <string name="settings_openclaw_config_editor_title">OpenClaw config editor</string>
+    <string name="settings_openclaw_config_editor_save">Save</string>
+    <string name="settings_openclaw_config_editor_current_source">Current source</string>
+    <string name="settings_openclaw_config_editor_backups">Backups</string>
+    <string name="settings_openclaw_config_editor_no_backups">No backups available</string>
+    <string name="settings_openclaw_config_editor_missing">openclaw.json was not found. You can create a new file.</string>
+    <string name="settings_openclaw_config_editor_save_failed">OpenClaw config editor error</string>
+    <string name="settings_openclaw_extension_prune">Delete unused OpenClaw extensions</string>
+    <string name="settings_openclaw_extension_prune_desc">Use this only if you selected proot (stability) and the gateway gets stuck on starting, or if OpenClaw becomes noticeably slow to respond.</string>
+    <string name="settings_openclaw_extension_prune_running">Deleting unused OpenClaw extensions…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">Delete unused OpenClaw extensions?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">Use this only if you selected proot (stability) and the gateway gets stuck on starting, or if OpenClaw becomes noticeably slow to respond. Missing items will be skipped automatically.</string>
+    <string name="settings_openclaw_extension_prune_done">Unused OpenClaw extensions deleted</string>
+    <string name="settings_openclaw_extension_prune_failed">Failed to delete unused OpenClaw extensions</string>
+    <string name="settings_openclaw_extension_prune_failed_message">Failed to delete preselected OpenClaw extensions.</string>
+    <string name="settings_openclaw_extension_prune_result_partial">Deleted: %1$d
+Already missing: %2$d
+Failed: %3$d
+Some items could not be removed.</string>
+    <string name="settings_openclaw_extension_prune_result_summary">Deleted: %1$d
+Already missing: %2$d
+Failed: %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">Delete</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">Available only when proot (stability) is selected.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">Loading this backup will replace the JSON currently in the editor. The backup is not applied until you save.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">Replace current draft?</string>
     <string name="settings_brave_search_key">Brave Search API Key</string>
     <string name="settings_brave_search_desc">Enables web search for AI agent. Optional — leave empty to disable.</string>
     <string name="settings_brave_search_optional">Not configured (optional)</string>

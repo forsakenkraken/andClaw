@@ -4,13 +4,17 @@ import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.coderred.andclaw.ui.screen.dashboard.DashboardScreen
 import com.coderred.andclaw.ui.screen.onboarding.OnboardingScreen
+import com.coderred.andclaw.ui.screen.settings.OpenClawConfigEditorScreen
 import com.coderred.andclaw.ui.screen.settings.SettingsScreen
+import com.coderred.andclaw.ui.screen.settings.SettingsViewModel
 import com.coderred.andclaw.ui.screen.setup.SetupScreen
 
 @Composable
@@ -98,8 +102,28 @@ fun AndClawNavGraph(
                 previousSavedStateHandle?.remove<Boolean>("settings_open_api_key_dialog") == true
             SettingsScreen(
                 onBack = { navController.popBackStack() },
+                onOpenClawConfigEditor = { navController.navigate(Screen.OpenClawConfigEditor.route) },
                 initialApiProvider = initialApiProvider,
                 openApiKeyDialogOnLaunch = openApiKeyDialogOnLaunch,
+            )
+        }
+
+        composable(Screen.OpenClawConfigEditor.route) { editorBackStackEntry ->
+            val settingsEntry = remember(editorBackStackEntry) {
+                navController.getBackStackEntry(Screen.Settings.route)
+            }
+            val settingsViewModel: SettingsViewModel = viewModel(settingsEntry)
+            OpenClawConfigEditorScreen(
+                onBack = { navController.popBackStack() },
+                onNavigateDashboard = {
+                    val poppedToDashboard = navController.popBackStack(Screen.Dashboard.route, inclusive = false)
+                    if (!poppedToDashboard) {
+                        navController.navigate(Screen.Dashboard.route) {
+                            launchSingleTop = true
+                        }
+                    }
+                },
+                viewModel = settingsViewModel,
             )
         }
     }

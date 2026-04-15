@@ -136,6 +136,40 @@ Kunci ini tidak dikirim ke server kami.</string>
 
     <!-- Tools -->
     <string name="settings_section_tools">Alat</string>
+    <string name="settings_section_advanced_users">Pengguna tingkat lanjut</string>
+    <string name="settings_execution_runtime_title">Runtime eksekusi</string>
+    <string name="settings_execution_runtime_desc">Ubah hanya jika runtime bawaan memiliki masalah kompatibilitas.</string>
+    <string name="settings_execution_runtime_dialog_title">Runtime eksekusi</string>
+    <string name="settings_execution_runtime_proroot">proroot (mulai cepat)</string>
+    <string name="settings_execution_runtime_proot">proot (stabilitas)</string>
+    <string name="settings_openclaw_config_editor_entry">Editor konfigurasi OpenClaw</string>
+    <string name="settings_openclaw_config_editor_entry_desc">Periksa, edit, dan pulihkan cadangan openclaw.json.</string>
+    <string name="settings_openclaw_config_editor_title">Editor konfigurasi OpenClaw</string>
+    <string name="settings_openclaw_config_editor_save">Simpan</string>
+    <string name="settings_openclaw_config_editor_current_source">Sumber saat ini</string>
+    <string name="settings_openclaw_config_editor_backups">Cadangan</string>
+    <string name="settings_openclaw_config_editor_no_backups">Tidak ada cadangan yang tersedia</string>
+    <string name="settings_openclaw_config_editor_missing">openclaw.json tidak ditemukan. Kamu bisa membuat file baru.</string>
+    <string name="settings_openclaw_config_editor_save_failed">Galat editor konfigurasi OpenClaw</string>
+    <string name="settings_openclaw_extension_prune">Hapus ekstensi OpenClaw yang tidak digunakan</string>
+    <string name="settings_openclaw_extension_prune_desc">Gunakan hanya jika kamu memilih proot (stabilitas) dan gateway macet saat mulai, atau jika OpenClaw terasa jauh lebih lambat saat merespons.</string>
+    <string name="settings_openclaw_extension_prune_running">Menghapus ekstensi OpenClaw yang tidak digunakan…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">Hapus ekstensi OpenClaw yang tidak digunakan?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">Gunakan hanya jika kamu memilih proot (stabilitas) dan gateway macet saat mulai, atau jika OpenClaw terasa jauh lebih lambat saat merespons. Item yang sudah tidak ada akan dilewati otomatis.</string>
+    <string name="settings_openclaw_extension_prune_done">Ekstensi OpenClaw yang tidak digunakan telah dihapus</string>
+    <string name="settings_openclaw_extension_prune_failed">Gagal menghapus ekstensi OpenClaw yang tidak digunakan</string>
+    <string name="settings_openclaw_extension_prune_failed_message">Gagal menghapus ekstensi OpenClaw yang sudah dipilih.</string>
+    <string name="settings_openclaw_extension_prune_result_partial">Dihapus: %1$d
+Sudah tidak ada: %2$d
+Gagal: %3$d
+Beberapa item tidak bisa dihapus.</string>
+    <string name="settings_openclaw_extension_prune_result_summary">Dihapus: %1$d
+Sudah tidak ada: %2$d
+Gagal: %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">Hapus</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">Hanya tersedia saat proot (stabilitas) dipilih.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">Memuat cadangan ini akan mengganti JSON yang sedang ada di editor. Cadangan belum benar-benar diterapkan sampai kamu menyimpan.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">Ganti draf saat ini?</string>
     <string name="settings_brave_search_key">Kunci API Brave Search</string>
     <string name="settings_brave_search_desc">Mengaktifkan pencarian web untuk agen AI. Opsional — kosongkan untuk menonaktifkan.</string>
     <string name="settings_brave_search_optional">Belum dikonfigurasi (opsional)</string>
@@ -310,7 +344,6 @@ Jangan tutup atau paksa hentikan aplikasi selama pemulihan masih berlangsung.</s
     <string name="settings_transfer_export_success">Ekspor transfer selesai.</string>
     <string name="settings_transfer_share_failed">File transfer tidak dapat dibagikan.</string>
 </resources>
-
 
 
 

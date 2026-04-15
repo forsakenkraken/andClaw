@@ -136,6 +136,40 @@
 
     <!-- Tools -->
     <string name="settings_section_tools">Инструменты</string>
+    <string name="settings_section_advanced_users">Продвинутые пользователи</string>
+    <string name="settings_execution_runtime_title">Среда выполнения</string>
+    <string name="settings_execution_runtime_desc">Меняйте только если у среды выполнения по умолчанию есть проблемы совместимости.</string>
+    <string name="settings_execution_runtime_dialog_title">Среда выполнения</string>
+    <string name="settings_execution_runtime_proroot">proroot (быстрый запуск)</string>
+    <string name="settings_execution_runtime_proot">proot (стабильность)</string>
+    <string name="settings_openclaw_config_editor_entry">Редактор конфигурации OpenClaw</string>
+    <string name="settings_openclaw_config_editor_entry_desc">Просматривайте, редактируйте и восстанавливайте резервные копии openclaw.json.</string>
+    <string name="settings_openclaw_config_editor_title">Редактор конфигурации OpenClaw</string>
+    <string name="settings_openclaw_config_editor_save">Сохранить</string>
+    <string name="settings_openclaw_config_editor_current_source">Текущий источник</string>
+    <string name="settings_openclaw_config_editor_backups">Резервные копии</string>
+    <string name="settings_openclaw_config_editor_no_backups">Резервных копий нет</string>
+    <string name="settings_openclaw_config_editor_missing">Файл openclaw.json не найден. Вы можете создать новый файл.</string>
+    <string name="settings_openclaw_config_editor_save_failed">Ошибка редактора конфигурации OpenClaw</string>
+    <string name="settings_openclaw_extension_prune">Удалить неиспользуемые расширения OpenClaw</string>
+    <string name="settings_openclaw_extension_prune_desc">Используйте только если выбран proot (стабильность) и gateway зависает при запуске, либо если OpenClaw начинает заметно медленнее отвечать.</string>
+    <string name="settings_openclaw_extension_prune_running">Удаление неиспользуемых расширений OpenClaw…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">Удалить неиспользуемые расширения OpenClaw?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">Используйте только если выбран proot (стабильность) и gateway зависает при запуске, либо если OpenClaw начинает заметно медленнее отвечать. Уже отсутствующие элементы будут автоматически пропущены.</string>
+    <string name="settings_openclaw_extension_prune_done">Неиспользуемые расширения OpenClaw удалены</string>
+    <string name="settings_openclaw_extension_prune_failed">Не удалось удалить неиспользуемые расширения OpenClaw</string>
+    <string name="settings_openclaw_extension_prune_failed_message">Не удалось удалить заранее выбранные расширения OpenClaw.</string>
+    <string name="settings_openclaw_extension_prune_result_partial">Удалено: %1$d
+Уже отсутствует: %2$d
+Ошибка: %3$d
+Некоторые элементы не удалось удалить.</string>
+    <string name="settings_openclaw_extension_prune_result_summary">Удалено: %1$d
+Уже отсутствует: %2$d
+Ошибка: %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">Удалить</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">Доступно только когда выбран proot (стабильность).</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">При загрузке этой резервной копии JSON в редакторе будет заменён. Копия реально применится только после сохранения.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">Заменить текущий черновик?</string>
     <string name="settings_brave_search_key">API-ключ Brave Search</string>
     <string name="settings_brave_search_desc">Включает веб-поиск для ИИ-агента. Необязательно — оставьте пустым для отключения.</string>
     <string name="settings_brave_search_optional">Не настроено (необязательно)</string>
@@ -310,7 +344,6 @@
     <string name="settings_transfer_export_success">Экспорт файла переноса завершен.</string>
     <string name="settings_transfer_share_failed">Не удалось поделиться файлом переноса.</string>
 </resources>
-
 
 
 

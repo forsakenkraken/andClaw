@@ -142,6 +142,40 @@ Er wird nicht an unsere Server gesendet.</string>
 
     <!-- Tools -->
     <string name="settings_section_tools">Werkzeuge</string>
+    <string name="settings_section_advanced_users">Erweiterte Nutzer</string>
+    <string name="settings_execution_runtime_title">Ausführungsruntime</string>
+    <string name="settings_execution_runtime_desc">Nur ändern, wenn die Standard-Runtime Kompatibilitätsprobleme hat.</string>
+    <string name="settings_execution_runtime_dialog_title">Ausführungsruntime</string>
+    <string name="settings_execution_runtime_proroot">proroot (schneller Start)</string>
+    <string name="settings_execution_runtime_proot">proot (stabiler)</string>
+    <string name="settings_openclaw_config_editor_entry">OpenClaw-Konfigurationseditor</string>
+    <string name="settings_openclaw_config_editor_entry_desc">openclaw.json und Sicherungen prüfen, bearbeiten und wiederherstellen.</string>
+    <string name="settings_openclaw_config_editor_title">OpenClaw-Konfigurationseditor</string>
+    <string name="settings_openclaw_config_editor_save">Speichern</string>
+    <string name="settings_openclaw_config_editor_current_source">Aktuelle Quelle</string>
+    <string name="settings_openclaw_config_editor_backups">Sicherungen</string>
+    <string name="settings_openclaw_config_editor_no_backups">Keine Sicherungen verfügbar</string>
+    <string name="settings_openclaw_config_editor_missing">openclaw.json wurde nicht gefunden. Sie können eine neue Datei erstellen.</string>
+    <string name="settings_openclaw_config_editor_save_failed">Fehler im OpenClaw-Konfigurationseditor</string>
+    <string name="settings_openclaw_extension_prune">Ungenutzte OpenClaw-Erweiterungen löschen</string>
+    <string name="settings_openclaw_extension_prune_desc">Nur verwenden, wenn proot (stabil) als Laufzeit gewählt ist und das Gateway beim Starten hängen bleibt oder OpenClaw spürbar träge reagiert.</string>
+    <string name="settings_openclaw_extension_prune_running">Ungenutzte OpenClaw-Erweiterungen werden gelöscht…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">Ungenutzte OpenClaw-Erweiterungen löschen?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">Nur verwenden, wenn proot (stabil) als Laufzeit gewählt ist und das Gateway beim Starten hängen bleibt oder OpenClaw spürbar träge reagiert. Bereits fehlende Einträge werden automatisch übersprungen.</string>
+    <string name="settings_openclaw_extension_prune_done">Ungenutzte OpenClaw-Erweiterungen gelöscht</string>
+    <string name="settings_openclaw_extension_prune_failed">Ungenutzte OpenClaw-Erweiterungen konnten nicht gelöscht werden</string>
+    <string name="settings_openclaw_extension_prune_failed_message">Vordefinierte OpenClaw-Erweiterungen konnten nicht gelöscht werden.</string>
+    <string name="settings_openclaw_extension_prune_result_partial">Gelöscht: %1$d
+Bereits fehlend: %2$d
+Fehlgeschlagen: %3$d
+Einige Einträge konnten nicht entfernt werden.</string>
+    <string name="settings_openclaw_extension_prune_result_summary">Gelöscht: %1$d
+Bereits fehlend: %2$d
+Fehlgeschlagen: %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">Löschen</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">Nur verfügbar, wenn proot (stabil) ausgewählt ist.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">Beim Laden dieses Backups wird das aktuell im Editor vorhandene JSON ersetzt. Das Backup wird erst nach dem Speichern wirklich angewendet.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">Aktuellen Entwurf ersetzen?</string>
     <string name="settings_brave_search_key">Brave Search API-Schlüssel</string>
     <string name="settings_brave_search_desc">Aktiviert die Websuche für den KI-Agenten. Optional — leer lassen zum Deaktivieren.</string>
     <string name="settings_brave_search_optional">Nicht konfiguriert (optional)</string>
@@ -316,7 +350,6 @@ Schließen Sie die App nicht und erzwingen Sie keinen Stopp, solange die Wiederh
     <string name="settings_transfer_export_success">Transferexport abgeschlossen.</string>
     <string name="settings_transfer_share_failed">Die Transferdatei konnte nicht geteilt werden.</string>
 </resources>
-
 
 
 

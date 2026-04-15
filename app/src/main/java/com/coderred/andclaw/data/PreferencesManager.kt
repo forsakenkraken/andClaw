@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.coderred.andclaw.proroot.ExecutionRuntime
 import com.coderred.andclaw.proroot.OpenClawModelCatalogReader
 import com.coderred.andclaw.proroot.ProrootManager
 import java.io.IOException
@@ -327,6 +328,7 @@ private val OLLAMA_SERVER_PREFERRED_KEY = booleanPreferencesKey("ollama_server_p
 private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fallback")
         private val KEY_AUTO_START_ON_BOOT = booleanPreferencesKey("auto_start_on_boot")
         private val KEY_CHARGE_ONLY_MODE = booleanPreferencesKey("charge_only_mode")
+        private val KEY_EXECUTION_RUNTIME = stringPreferencesKey("execution_runtime")
         private val KEY_OPENCLAW_VERSION = stringPreferencesKey("openclaw_version")
         private val KEY_SELECTED_MODEL = stringPreferencesKey("selected_model")
         private val KEY_SELECTED_MODEL_PROVIDER = stringPreferencesKey("selected_model_provider")
@@ -992,6 +994,10 @@ private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fa
         prefs[KEY_CHARGE_ONLY_MODE] ?: false
     }
 
+    val executionRuntime: Flow<String> = context.dataStore.data.map { prefs ->
+        normalizeExecutionRuntime(prefs[KEY_EXECUTION_RUNTIME]).storageValue
+    }
+
     val openClawVersion: Flow<String> = context.dataStore.data.map { prefs ->
         prefs[KEY_OPENCLAW_VERSION] ?: ""
     }
@@ -1571,6 +1577,16 @@ private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fa
 
     suspend fun setChargeOnlyMode(enabled: Boolean) {
         context.dataStore.edit { it[KEY_CHARGE_ONLY_MODE] = enabled }
+    }
+
+    suspend fun setExecutionRuntime(runtime: String) {
+        context.dataStore.edit {
+            it[KEY_EXECUTION_RUNTIME] = normalizeExecutionRuntime(runtime).storageValue
+        }
+    }
+
+    private fun normalizeExecutionRuntime(value: String?): ExecutionRuntime {
+        return ExecutionRuntime.fromStorageValue(value)
     }
 
     suspend fun setOpenClawVersion(version: String) {

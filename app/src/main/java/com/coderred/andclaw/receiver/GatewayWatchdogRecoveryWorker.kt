@@ -20,6 +20,7 @@ import com.coderred.andclaw.MainActivity
 import com.coderred.andclaw.R
 import com.coderred.andclaw.data.GatewayStatus
 import com.coderred.andclaw.data.PreferencesManager
+import com.coderred.andclaw.proroot.ExecutionRuntime
 import com.coderred.andclaw.service.GatewayService
 import kotlinx.coroutines.flow.first
 
@@ -33,7 +34,6 @@ class GatewayWatchdogRecoveryWorker(
         private const val CHANNEL_ID = "andclaw_watchdog_recovery"
         private const val NOTIFICATION_ID = 30101
         private const val HEALTH_PROBE_TIMEOUT_MS = 15_000L
-        private const val STARTING_RECOVERY_GRACE_PERIOD_SECONDS = 300L
         private const val RUNNING_HEALTH_GRACE_PERIOD_SECONDS = 90L
 
         internal enum class RecoveryAction {
@@ -49,12 +49,15 @@ class GatewayWatchdogRecoveryWorker(
             runningHealthy: Boolean,
             startupAttemptActive: Boolean = false,
             startupUptimeSeconds: Long = 0L,
+            startupGracePeriodSeconds: Long = GatewayWatchdogReceiver.resolveStartingRecoveryGracePeriodSeconds(
+                ExecutionRuntime.PROROOT,
+            ),
             runningUptimeSeconds: Long = Long.MAX_VALUE,
         ): RecoveryAction {
-            if (startupAttemptActive && startupUptimeSeconds < STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
+            if (startupAttemptActive && startupUptimeSeconds < startupGracePeriodSeconds) {
                 return RecoveryAction.NONE
             }
-            if (startupAttemptActive && startupUptimeSeconds >= STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
+            if (startupAttemptActive && startupUptimeSeconds >= startupGracePeriodSeconds) {
                 return RecoveryAction.RESTART
             }
 
@@ -72,7 +75,7 @@ class GatewayWatchdogRecoveryWorker(
                     }
                 }
                 GatewayStatus.STARTING -> {
-                    if (startupUptimeSeconds >= STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
+                    if (startupUptimeSeconds >= startupGracePeriodSeconds) {
                         RecoveryAction.RESTART
                     } else {
                         RecoveryAction.NONE
@@ -107,6 +110,8 @@ class GatewayWatchdogRecoveryWorker(
         // processManager가 null(서비스 재생성 중)이면 prefs에서 startup attempt 상태를 읽는다
         val startupAttemptActive = startupAttemptAgeSeconds != null ||
             (processManager == null && prefs.getGatewaySurvivorMetadata()?.startupAttemptActive == true)
+        val runtime = ExecutionRuntime.fromStorageValue(prefs.executionRuntime.first())
+        val startupGracePeriodSeconds = GatewayWatchdogReceiver.resolveStartingRecoveryGracePeriodSeconds(runtime)
         val runningHealthy = if (status == GatewayStatus.RUNNING) {
             val healthy = processManager?.probeGatewayHealth(timeoutMs = HEALTH_PROBE_TIMEOUT_MS) == true
             gatewayState = processManager?.gatewayState?.value ?: gatewayState
@@ -130,6 +135,7 @@ class GatewayWatchdogRecoveryWorker(
             runningHealthy = runningHealthy,
             startupAttemptActive = startupAttemptActive,
             startupUptimeSeconds = startupAttemptAgeSeconds ?: 0L,
+            startupGracePeriodSeconds = startupGracePeriodSeconds,
             runningUptimeSeconds = runningUptimeSeconds,
         )
         val needsRecovery = recoveryAction != RecoveryAction.NONE

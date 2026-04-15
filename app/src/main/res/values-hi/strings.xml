@@ -136,6 +136,40 @@
 
     <!-- Tools -->
     <string name="settings_section_tools">टूल्स</string>
+    <string name="settings_section_advanced_users">उन्नत उपयोगकर्ता</string>
+    <string name="settings_execution_runtime_title">एक्जीक्यूशन रनटाइम</string>
+    <string name="settings_execution_runtime_desc">इसे केवल तब बदलें जब डिफ़ॉल्ट रनटाइम में संगतता समस्या हो।</string>
+    <string name="settings_execution_runtime_dialog_title">एक्जीक्यूशन रनटाइम</string>
+    <string name="settings_execution_runtime_proroot">proroot (तेज़ शुरूआत)</string>
+    <string name="settings_execution_runtime_proot">proot (स्थिरता)</string>
+    <string name="settings_openclaw_config_editor_entry">OpenClaw कॉन्फ़िग एडिटर</string>
+    <string name="settings_openclaw_config_editor_entry_desc">openclaw.json बैकअप देखें, संपादित करें और पुनर्स्थापित करें.</string>
+    <string name="settings_openclaw_config_editor_title">OpenClaw कॉन्फ़िग एडिटर</string>
+    <string name="settings_openclaw_config_editor_save">सहेजें</string>
+    <string name="settings_openclaw_config_editor_current_source">वर्तमान स्रोत</string>
+    <string name="settings_openclaw_config_editor_backups">बैकअप</string>
+    <string name="settings_openclaw_config_editor_no_backups">कोई बैकअप उपलब्ध नहीं है</string>
+    <string name="settings_openclaw_config_editor_missing">openclaw.json नहीं मिला। आप नई फ़ाइल बना सकते हैं।</string>
+    <string name="settings_openclaw_config_editor_save_failed">OpenClaw कॉन्फ़िग एडिटर त्रुटि</string>
+    <string name="settings_openclaw_extension_prune">अनुपयोगी OpenClaw एक्सटेंशन हटाएँ</string>
+    <string name="settings_openclaw_extension_prune_desc">इसे केवल तब इस्तेमाल करें जब आपने proot (स्थिरता) चुना हो और gateway शुरू होते समय अटक जाए, या OpenClaw की प्रतिक्रिया साफ़ तौर पर बहुत धीमी हो जाए।</string>
+    <string name="settings_openclaw_extension_prune_running">अनुपयोगी OpenClaw एक्सटेंशन हटाए जा रहे हैं…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">क्या अनुपयोगी OpenClaw एक्सटेंशन हटाने हैं?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">इसे केवल तब इस्तेमाल करें जब आपने proot (स्थिरता) चुना हो और gateway शुरू होते समय अटक जाए, या OpenClaw की प्रतिक्रिया साफ़ तौर पर बहुत धीमी हो जाए। जो आइटम पहले से नहीं हैं उन्हें अपने-आप छोड़ दिया जाएगा।</string>
+    <string name="settings_openclaw_extension_prune_done">अनुपयोगी OpenClaw एक्सटेंशन हटा दिए गए</string>
+    <string name="settings_openclaw_extension_prune_failed">अनुपयोगी OpenClaw एक्सटेंशन हटाने में विफल</string>
+    <string name="settings_openclaw_extension_prune_failed_message">पहले से चुने गए OpenClaw एक्सटेंशन हटाए नहीं जा सके।</string>
+    <string name="settings_openclaw_extension_prune_result_partial">हटाए गए: %1$d
+पहले से नहीं हैं: %2$d
+विफल: %3$d
+कुछ आइटम हटाए नहीं जा सके।</string>
+    <string name="settings_openclaw_extension_prune_result_summary">हटाए गए: %1$d
+पहले से नहीं हैं: %2$d
+विफल: %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">हटाएँ</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">यह केवल तब उपलब्ध है जब proot (स्थिरता) चुना गया हो।</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">इस बैकअप को लोड करने पर एडिटर में मौजूद JSON बदल जाएगा। सेव करने तक बैकअप वास्तव में लागू नहीं होगा।</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">क्या मौजूदा ड्राफ्ट बदलना है?</string>
     <string name="settings_brave_search_key">Brave Search API कुंजी</string>
     <string name="settings_brave_search_desc">AI एजेंट के लिए वेब सर्च सक्षम करता है। वैकल्पिक — अक्षम करने के लिए खाली छोड़ें।</string>
     <string name="settings_brave_search_optional">कॉन्फ़िगर नहीं (वैकल्पिक)</string>
@@ -310,7 +344,6 @@
     <string name="settings_transfer_export_success">ट्रांसफर निर्यात पूरा हुआ।</string>
     <string name="settings_transfer_share_failed">ट्रांसफर फ़ाइल साझा नहीं की जा सकी।</string>
 </resources>
-
 
 
 

@@ -2,9 +2,12 @@ package com.coderred.andclaw.proroot
 
 import android.content.Context
 import android.util.Log
+import com.coderred.andclaw.data.PreferencesManager
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 
 /**
  * proroot 바이너리, rootfs, Node.js 경로를 관리하고
@@ -13,7 +16,13 @@ import java.util.concurrent.TimeUnit
  * proroot 바이너리는 APK의 jniLibs/arm64-v8a/libproroot.so 로 패키징되어
  * 설치 시 nativeLibraryDir에 자동 추출된다.
  */
-class ProrootManager(private val context: Context) {
+class ProrootManager(
+    private val context: Context,
+    private val runtimeProvider: (() -> ExecutionRuntime)? = null,
+) {
+    @Volatile
+    private var activeRuntime: ExecutionRuntime = ExecutionRuntime.PROROOT
+
     data class CommandResult(
         val exitCode: Int,
         val output: String,
@@ -47,6 +56,22 @@ class ProrootManager(private val context: Context) {
     private val nativeProrootPath: String
         get() = File(context.applicationInfo.nativeLibraryDir, "libproroot.so").absolutePath
 
+    /** nativeLibraryDir 의 legacy proot binary */
+    private val nativeProotPath: String
+        get() = File(context.applicationInfo.nativeLibraryDir, "libproot.so").absolutePath
+
+    /** nativeLibraryDir 의 legacy libtalloc */
+    private val nativeTallocPath: String
+        get() = File(context.applicationInfo.nativeLibraryDir, "libtalloc.so").absolutePath
+
+    /** nativeLibraryDir 의 legacy proot loader */
+    private val nativeProotLoaderPath: String
+        get() = File(context.applicationInfo.nativeLibraryDir, "libproot-loader.so").absolutePath
+
+    /** nativeLibraryDir 의 legacy 32-bit proot loader */
+    private val nativeProotLoader32Path: String
+        get() = File(context.applicationInfo.nativeLibraryDir, "libproot-loader32.so").absolutePath
+
     /** nativeLibraryDir 의 proroot hook library */
     private val nativeHookLibPath: String
         get() = File(context.applicationInfo.nativeLibraryDir, "libproroot-runtime.so").absolutePath
@@ -67,9 +92,34 @@ class ProrootManager(private val context: Context) {
     val guestVforkShimHostPath: File
         get() = File(rootfsDir, "root/.proroot/libvfork_shim.so")
 
+    /** 실행용 바이너리 디렉토리 (legacy proot용) */
+    private val binDir: File
+        get() = File(context.filesDir, "bin")
+
+    /** 실행용 라이브러리 디렉토리 (legacy proot용) */
+    val libLinksDir: File
+        get() = File(context.filesDir, "lib")
+
     /** 실제 실행할 proroot 바이너리 경로 (nativeLibraryDir 에서 직접 실행) */
     val prorootBinaryPath: String
         get() = nativeProrootPath
+
+    val prootBinaryPath: String
+        get() = nativeProotPath
+
+    val selectedRuntime: ExecutionRuntime
+        get() = runtimeProvider?.invoke() ?: runCatching {
+            runBlocking { ExecutionRuntime.fromStorageValue(PreferencesManager(context).executionRuntime.first()) }
+        }.getOrDefault(ExecutionRuntime.PROROOT)
+
+    val currentRuntime: ExecutionRuntime
+        get() = activeRuntime
+
+    val activeRuntimeBinaryPath: String
+        get() = when (selectedRuntime) {
+            ExecutionRuntime.PROOT -> prootBinaryPath
+            ExecutionRuntime.PROROOT -> prorootBinaryPath
+        }
 
     val rootfsDir: File
         get() = File(context.filesDir, "rootfs")
@@ -93,6 +143,22 @@ class ProrootManager(private val context: Context) {
             val native = File(nativeProrootPath)
             return native.exists() && native.canExecute()
         }
+
+    val isProotAvailable: Boolean
+        get() {
+            val requiredFiles = listOf(
+                File(nativeProotPath),
+                File(nativeTallocPath),
+                File(nativeProotLoaderPath),
+                File(nativeProotLoader32Path),
+            )
+            return requiredFiles.all { it.exists() && it.canExecute() }
+        }
+
+    fun isRuntimeAvailable(runtime: ExecutionRuntime = selectedRuntime): Boolean = when (runtime) {
+        ExecutionRuntime.PROOT -> isProotAvailable
+        ExecutionRuntime.PROROOT -> isProrootAvailable
+    }
 
     val isRootfsInstalled: Boolean
         get() = File(rootfsDir, "bin/sh").exists()
@@ -128,7 +194,7 @@ class ProrootManager(private val context: Context) {
         }
 
     val isFullySetup: Boolean
-        get() = isProrootAvailable && isRootfsInstalled && isNodeInstalled && isOpenClawInstalled
+        get() = isRuntimeAvailable() && isRootfsInstalled && isNodeInstalled && isOpenClawInstalled
 
     fun refreshChromiumExecutableMarker(): Boolean {
         val detectedPath = detectChromiumExecutablePath() ?: run {
@@ -265,6 +331,55 @@ class ProrootManager(private val context: Context) {
         }
     }
 
+    fun setupNativeLibLinks() {
+        binDir.mkdirs()
+        libLinksDir.mkdirs()
+
+        val nativeProot = File(nativeProotPath)
+        val localProot = File(binDir, "proot")
+        if (nativeProot.exists() && (!localProot.exists() || localProot.length() != nativeProot.length())) {
+            nativeProot.inputStream().use { input ->
+                localProot.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            localProot.setExecutable(true, false)
+            localProot.setReadable(true, false)
+        }
+
+        val nativeTalloc = File(nativeTallocPath)
+        val localTalloc = File(libLinksDir, "libtalloc.so.2")
+        val isSymlink = localTalloc.exists() && java.nio.file.Files.isSymbolicLink(localTalloc.toPath())
+        val needsCopy = !localTalloc.exists() || isSymlink || localTalloc.length() != nativeTalloc.length()
+
+        if (nativeTalloc.exists() && needsCopy) {
+            localTalloc.delete()
+            nativeTalloc.inputStream().use { input ->
+                localTalloc.outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+            localTalloc.setReadable(true, false)
+            localTalloc.setExecutable(true, false)
+        }
+    }
+
+    fun prepareRuntime(runtime: ExecutionRuntime) {
+        activeRuntime = runtime
+        when (runtime) {
+            ExecutionRuntime.PROOT -> setupNativeLibLinks()
+            ExecutionRuntime.PROROOT -> setupHookLibrary()
+        }
+    }
+
+    fun prepareSelectedRuntime() {
+        prepareRuntime(selectedRuntime)
+    }
+
+    fun ldLibraryPath(): String {
+        return "${libLinksDir.absolutePath}:${context.applicationInfo.nativeLibraryDir}"
+    }
+
     private fun File.sha256OrNull(): String? {
         if (!exists()) return null
         return runCatching {
@@ -287,7 +402,25 @@ class ProrootManager(private val context: Context) {
     val shmDir: File
         get() = File(context.cacheDir, "shm").apply { mkdirs() }
 
-    fun buildProrootCommand(command: String): List<String> {
+    fun buildProrootCommand(
+        command: String,
+        runtime: ExecutionRuntime = currentRuntime,
+    ): List<String> {
+        if (runtime == ExecutionRuntime.PROOT) {
+            return listOf(
+                prootBinaryPath,
+                "-r", rootfsDir.absolutePath,
+                "-b", "/dev",
+                "-b", "/proc",
+                "-b", "/sys",
+                "-b", "/dev/urandom:/dev/random",
+                "-b", "${shmDir.absolutePath}:/dev/shm",
+                "-0",
+                "-w", "/root",
+                "--link2symlink",
+                "/bin/sh", "-c", command,
+            )
+        }
         return listOf(
             prorootBinaryPath,
             "-r", rootfsDir.absolutePath,
@@ -302,8 +435,33 @@ class ProrootManager(private val context: Context) {
         )
     }
 
-    fun buildProrootArgvCommand(argv: List<String>): List<String> {
+    fun buildProrootArgvCommand(
+        argv: List<String>,
+        runtime: ExecutionRuntime = currentRuntime,
+    ): List<String> {
         require(argv.isNotEmpty()) { "argv must not be empty" }
+        if (runtime == ExecutionRuntime.PROOT) {
+            return buildList {
+                add(prootBinaryPath)
+                add("-r")
+                add(rootfsDir.absolutePath)
+                add("-b")
+                add("/dev")
+                add("-b")
+                add("/proc")
+                add("-b")
+                add("/sys")
+                add("-b")
+                add("/dev/urandom:/dev/random")
+                add("-b")
+                add("${shmDir.absolutePath}:/dev/shm")
+                add("-0")
+                add("-w")
+                add("/root")
+                add("--link2symlink")
+                addAll(argv)
+            }
+        }
         return buildList {
             add(prorootBinaryPath)
             add("-r")
@@ -325,9 +483,13 @@ class ProrootManager(private val context: Context) {
         }
     }
 
-    fun buildOpenClawNodeCommand(vararg args: String): List<String> {
+    fun buildOpenClawNodeCommand(
+        vararg args: String,
+        runtime: ExecutionRuntime = currentRuntime,
+    ): List<String> {
         return buildProrootArgvCommand(
             listOf(OPENCLAW_NODE_BIN, OPENCLAW_ENTRYPOINT) + args.toList(),
+            runtime = runtime,
         )
     }
 
@@ -340,14 +502,15 @@ class ProrootManager(private val context: Context) {
         )
     }
 
-    fun buildGatewayCommand(): List<String> {
+    fun buildGatewayCommand(runtime: ExecutionRuntime = currentRuntime): List<String> {
         return buildProrootCommand(
                 "export UV_USE_IO_URING=0 && " +
                 "export NODE_OPTIONS='--require /root/.openclaw-patch.js' && " +
                 "export NODE_COMPILE_CACHE=/root/.cache/node-compile-cache && " +
                 "TG_IP=$(node -e \"const dns=require('dns');dns.resolve4('api.telegram.org',(e,a)=>{if(e||!a||!a.length)process.exit(1);process.stdout.write(a[0]);});\" 2>/dev/null || true); " +
                 "(grep -v 'api.telegram.org' /etc/hosts 2>/dev/null; [ -n \"\$TG_IP\" ] && echo \"\$TG_IP api.telegram.org\") > /tmp/hosts.andclaw 2>/dev/null && cat /tmp/hosts.andclaw > /etc/hosts 2>/dev/null || true; " +
-                "openclaw gateway run"
+                "openclaw gateway run",
+            runtime = runtime,
         )
     }
 
@@ -362,7 +525,22 @@ class ProrootManager(private val context: Context) {
     private val nativeTrampolinePath: String
         get() = File(context.applicationInfo.nativeLibraryDir, "libproroot-bridge.so").absolutePath
 
-    fun buildEnvironment(extra: Map<String, String> = emptyMap()): Map<String, String> {
+    fun buildEnvironment(
+        extra: Map<String, String> = emptyMap(),
+        runtime: ExecutionRuntime = currentRuntime,
+    ): Map<String, String> {
+        if (runtime == ExecutionRuntime.PROOT) {
+            val nativeDir = context.applicationInfo.nativeLibraryDir
+            return buildMap {
+                put("HOME", homeDir.absolutePath)
+                put("LD_LIBRARY_PATH", ldLibraryPath())
+                put("PROOT_TMP_DIR", File(context.cacheDir, "proot_tmp").apply { mkdirs() }.absolutePath)
+                put("PROOT_LOADER", nativeProotLoaderPath.ifBlank { "$nativeDir/libproot-loader.so" })
+                put("PROOT_LOADER_32", nativeProotLoader32Path.ifBlank { "$nativeDir/libproot-loader32.so" })
+                put("PLAYWRIGHT_BROWSERS_PATH", File(rootfsDir, "root/.cache/ms-playwright").absolutePath)
+                putAll(extra)
+            }
+        }
         return buildMap {
             put("HOME", homeDir.absolutePath)
             put("PROROOT_LIB_PATH", nativeHookLibPath)
@@ -381,7 +559,11 @@ class ProrootManager(private val context: Context) {
         }
     }
 
-    internal fun applyEnvironment(target: MutableMap<String, String>, extra: Map<String, String> = emptyMap()) {
+    internal fun applyEnvironment(
+        target: MutableMap<String, String>,
+        extra: Map<String, String> = emptyMap(),
+        runtime: ExecutionRuntime = currentRuntime,
+    ) {
         target.clear()
         target.putAll(
             buildEnvironment(
@@ -391,6 +573,7 @@ class ProrootManager(private val context: Context) {
                     "LANG" to "C.UTF-8",
                     "UV_USE_IO_URING" to "0",
                 ) + extra,
+                runtime = runtime,
             ),
         )
     }
@@ -398,11 +581,14 @@ class ProrootManager(private val context: Context) {
     /**
      * proroot 안에서 명령을 실행하고 stdout 결과를 반환한다.
      */
-    fun executeAndCapture(command: String): String? {
+    fun executeAndCapture(
+        command: String,
+        runtime: ExecutionRuntime = currentRuntime,
+    ): String? {
         return try {
-            val cmd = buildProrootCommand(command)
+            val cmd = buildProrootCommand(command, runtime)
             val pb = ProcessBuilder(cmd).redirectErrorStream(false)
-            applyEnvironment(pb.environment())
+            applyEnvironment(pb.environment(), runtime = runtime)
             val process = pb.start()
             val output = process.inputStream.bufferedReader().readText().trim()
             process.waitFor()
@@ -421,15 +607,16 @@ class ProrootManager(private val context: Context) {
         extraEnv: Map<String, String> = emptyMap(),
         wrapInHostShell: Boolean = false,
         captureViaTempFile: Boolean = false,
+        runtime: ExecutionRuntime = currentRuntime,
     ): CommandResult? {
         return try {
-            val rawCmd = buildProrootCommand(command)
+            val rawCmd = buildProrootCommand(command, runtime)
             val cmd = if (wrapInHostShell) buildHostShellWrappedCommand(rawCmd) else rawCmd
             val tempOutputFile = if (captureViaTempFile) File.createTempFile("proroot-capture-", ".log", context.cacheDir) else null
             val pb = ProcessBuilder(cmd)
                 .redirectErrorStream(true)
                 .redirectInput(devNull)
-            applyEnvironment(pb.environment(), extraEnv)
+            applyEnvironment(pb.environment(), extraEnv, runtime)
             if (tempOutputFile != null) {
                 pb.redirectOutput(tempOutputFile)
             }
@@ -469,13 +656,14 @@ class ProrootManager(private val context: Context) {
         timeoutMs: Long = 300_000,
         extraEnv: Map<String, String> = emptyMap(),
         wrapInHostShell: Boolean = false,
+        runtime: ExecutionRuntime = currentRuntime,
     ): CommandResult? {
         return try {
-            val rawCmd = buildProrootArgvCommand(argv)
+            val rawCmd = buildProrootArgvCommand(argv, runtime)
             val cmd = if (wrapInHostShell) buildHostShellWrappedCommand(rawCmd) else rawCmd
             val pb = ProcessBuilder(cmd).redirectErrorStream(true)
                 .redirectInput(devNull)
-            applyEnvironment(pb.environment(), extraEnv)
+            applyEnvironment(pb.environment(), extraEnv, runtime)
             android.util.Log.d("ProrootManager", "exec(argv): cmd_size=${cmd.size} cmd=${cmd.map { "[$it]" }}")
             android.util.Log.d("ProrootManager", "exec(argv): PROROOT_LIB_PATH=${pb.environment()["PROROOT_LIB_PATH"]}")
             val process = pb.start()
@@ -511,12 +699,13 @@ class ProrootManager(private val context: Context) {
     fun executeWithStreamingOutput(
         command: String,
         onLine: (String) -> Unit,
+        runtime: ExecutionRuntime = currentRuntime,
     ): CommandResult? {
         return try {
-            val cmd = buildProrootCommand(command)
+            val cmd = buildProrootCommand(command, runtime)
             val pb = ProcessBuilder(cmd).redirectErrorStream(true)
                 .redirectInput(devNull)
-            applyEnvironment(pb.environment())
+            applyEnvironment(pb.environment(), runtime = runtime)
             val process = pb.start()
             runCatching { process.outputStream.close() }
 

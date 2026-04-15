@@ -12,7 +12,18 @@ When distributing APK/AAB artifacts, you must comply with each component's licen
   - `libproroot.so` is documented upstream as proprietary/free-to-use.
   - `libldlinux.so` is derived from GNU C Library and remains subject to LGPL-2.1 obligations.
 
-### 2) openclaw (bundled CLI assets)
+### 2) proot / libtalloc (legacy compatibility runtime)
+- Upstream:
+  - https://github.com/termux/proot
+  - https://github.com/samba-team/samba/tree/master/lib/talloc
+- License:
+  - `proot`: GPL-2.0
+  - `libtalloc`: LGPL-3.0-or-later
+- Distribution note:
+  - This app may redistribute the legacy Termux `proot` compatibility runtime as `libproot.so`, `libproot-loader.so`, `libproot-loader32.so`, and `libtalloc.so`.
+  - If these binaries are included in APK/AAB artifacts, keep corresponding source access and license notices available.
+
+### 3) openclaw (bundled CLI assets)
 - Upstream:
   - https://www.npmjs.com/package/openclaw
 - License: MIT
@@ -23,7 +34,7 @@ When distributing APK/AAB artifacts, you must comply with each component's licen
   - Public source repository for this app:
     - https://github.com/coderredlab/andClaw
 
-### 3) OpenClaw bundled dependencies (selected copyleft-sensitive)
+### 4) OpenClaw bundled dependencies (selected copyleft-sensitive)
 - The bundled OpenClaw asset tree includes many transitive packages.
 - Current bundled tree includes packages with additional obligations:
   - `@whiskeysockets/libsignal-node`

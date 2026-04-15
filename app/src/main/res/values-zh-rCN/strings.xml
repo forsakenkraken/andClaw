@@ -137,6 +137,40 @@
 
     <!-- Tools -->
     <string name="settings_section_tools">工具</string>
+    <string name="settings_section_advanced_users">高级用户</string>
+    <string name="settings_execution_runtime_title">执行运行时</string>
+    <string name="settings_execution_runtime_desc">仅当默认运行时存在兼容性问题时才更改。</string>
+    <string name="settings_execution_runtime_dialog_title">执行运行时</string>
+    <string name="settings_execution_runtime_proroot">proroot（快速启动）</string>
+    <string name="settings_execution_runtime_proot">proot（稳定性）</string>
+    <string name="settings_openclaw_config_editor_entry">OpenClaw 配置编辑器</string>
+    <string name="settings_openclaw_config_editor_entry_desc">检查、编辑并恢复 openclaw.json 备份。</string>
+    <string name="settings_openclaw_config_editor_title">OpenClaw 配置编辑器</string>
+    <string name="settings_openclaw_config_editor_save">保存</string>
+    <string name="settings_openclaw_config_editor_current_source">当前来源</string>
+    <string name="settings_openclaw_config_editor_backups">备份</string>
+    <string name="settings_openclaw_config_editor_no_backups">没有可用备份</string>
+    <string name="settings_openclaw_config_editor_missing">未找到 openclaw.json。你可以创建一个新文件。</string>
+    <string name="settings_openclaw_config_editor_save_failed">OpenClaw 配置编辑器错误</string>
+    <string name="settings_openclaw_extension_prune">删除未使用的 OpenClaw 扩展</string>
+    <string name="settings_openclaw_extension_prune_desc">仅在你选择了 proot（稳定性），且 gateway 卡在“正在启动”或 OpenClaw 响应明显变慢时使用。</string>
+    <string name="settings_openclaw_extension_prune_running">正在删除未使用的 OpenClaw 扩展…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">删除未使用的 OpenClaw 扩展？</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">仅在你选择了 proot（稳定性），且 gateway 卡在“正在启动”或 OpenClaw 响应明显变慢时使用。已经不存在的项目会自动跳过。</string>
+    <string name="settings_openclaw_extension_prune_done">未使用的 OpenClaw 扩展已删除</string>
+    <string name="settings_openclaw_extension_prune_failed">删除未使用的 OpenClaw 扩展失败</string>
+    <string name="settings_openclaw_extension_prune_failed_message">无法删除预先指定的 OpenClaw 扩展。</string>
+    <string name="settings_openclaw_extension_prune_result_partial">已删除：%1$d
+本来不存在：%2$d
+失败：%3$d
+有些项目未能删除。</string>
+    <string name="settings_openclaw_extension_prune_result_summary">已删除：%1$d
+本来不存在：%2$d
+失败：%3$d</string>
+    <string name="settings_openclaw_extension_prune_action">删除</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">仅在选择了 proot（稳定性）时可用。</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">加载此备份会替换编辑器中当前的 JSON。在保存之前，备份不会真正生效。</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">替换当前草稿？</string>
     <string name="settings_brave_search_key">Brave Search API 密钥</string>
     <string name="settings_brave_search_desc">启用 AI 代理的网页搜索。可选 — 留空则禁用。</string>
     <string name="settings_brave_search_optional">未配置（可选）</string>
@@ -311,7 +345,6 @@
     <string name="settings_transfer_export_success">传输导出已完成。</string>
     <string name="settings_transfer_share_failed">无法分享传输文件。</string>
 </resources>
-
 
 
 

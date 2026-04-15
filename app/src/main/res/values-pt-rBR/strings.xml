@@ -136,6 +136,40 @@ Ela não é enviada para nossos servidores.</string>
 
     <!-- Tools -->
     <string name="settings_section_tools">Ferramentas</string>
+    <string name="settings_section_advanced_users">Usuários avançados</string>
+    <string name="settings_execution_runtime_title">Runtime de execução</string>
+    <string name="settings_execution_runtime_desc">Altere apenas se o runtime padrão tiver problemas de compatibilidade.</string>
+    <string name="settings_execution_runtime_dialog_title">Runtime de execução</string>
+    <string name="settings_execution_runtime_proroot">proroot (início rápido)</string>
+    <string name="settings_execution_runtime_proot">proot (estabilidade)</string>
+    <string name="settings_openclaw_config_editor_entry">Editor de configuração do OpenClaw</string>
+    <string name="settings_openclaw_config_editor_entry_desc">Inspecione, edite e restaure backups de openclaw.json.</string>
+    <string name="settings_openclaw_config_editor_title">Editor de configuração do OpenClaw</string>
+    <string name="settings_openclaw_config_editor_save">Salvar</string>
+    <string name="settings_openclaw_config_editor_current_source">Fonte atual</string>
+    <string name="settings_openclaw_config_editor_backups">Backups</string>
+    <string name="settings_openclaw_config_editor_no_backups">Nenhum backup disponível</string>
+    <string name="settings_openclaw_config_editor_missing">openclaw.json não foi encontrado. Você pode criar um novo arquivo.</string>
+    <string name="settings_openclaw_config_editor_save_failed">Erro do editor de configuração do OpenClaw</string>
+    <string name="settings_openclaw_extension_prune">Excluir extensões OpenClaw não utilizadas</string>
+    <string name="settings_openclaw_extension_prune_desc">Use isto apenas se você escolheu proot (estabilidade) e o gateway ficar travado ao iniciar, ou se o OpenClaw ficar visivelmente mais lento para responder.</string>
+    <string name="settings_openclaw_extension_prune_running">Excluindo extensões OpenClaw não utilizadas…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">Excluir extensões OpenClaw não utilizadas?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">Use isto apenas se você escolheu proot (estabilidade) e o gateway ficar travado ao iniciar, ou se o OpenClaw ficar visivelmente mais lento para responder. Itens que já não existirem serão ignorados automaticamente.</string>
+    <string name="settings_openclaw_extension_prune_done">Extensões OpenClaw não utilizadas excluídas</string>
+    <string name="settings_openclaw_extension_prune_failed">Falha ao excluir extensões OpenClaw não utilizadas</string>
+    <string name="settings_openclaw_extension_prune_failed_message">Não foi possível excluir as extensões OpenClaw pré-selecionadas.</string>
+    <string name="settings_openclaw_extension_prune_result_partial">Excluídas: %1$d
+Já ausentes: %2$d
+Falhas: %3$d
+Alguns itens não puderam ser removidos.</string>
+    <string name="settings_openclaw_extension_prune_result_summary">Excluídas: %1$d
+Já ausentes: %2$d
+Falhas: %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">Excluir</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">Disponível apenas quando proot (estabilidade) estiver selecionado.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">Carregar este backup substituirá o JSON atualmente no editor. O backup só será realmente aplicado depois que você salvar.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">Substituir o rascunho atual?</string>
     <string name="settings_brave_search_key">Chave API do Brave Search</string>
     <string name="settings_brave_search_desc">Ativa a pesquisa web para o agente de IA. Opcional — deixe vazio para desativar.</string>
     <string name="settings_brave_search_optional">Não configurado (opcional)</string>
@@ -310,7 +344,6 @@ Não feche nem force a parada do app enquanto a recuperação estiver em andamen
     <string name="settings_transfer_export_success">Exportação da transferência concluída.</string>
     <string name="settings_transfer_share_failed">Não foi possível compartilhar o arquivo de transferência.</string>
 </resources>
-
 
 
 

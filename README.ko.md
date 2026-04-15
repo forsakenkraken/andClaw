@@ -65,6 +65,12 @@ Google Play: https://play.google.com/store/apps/details?id=com.coderred.andclaw
 ./gradlew lintDebug
 ```
 
+## 16KB 페이지 크기 호환성
+
+Google Play는 Android 15+ 타깃 앱에 16KB 페이지 크기 호환을 요구합니다. `scripts/setup-assets.sh`는 패키징 전에 번들 네이티브 바이너리를 검증합니다.
+
+- `scripts/setup-assets.sh`가 `app/src/main/jniLibs/arm64-v8a/*.so`의 LOAD 세그먼트 정렬을 확인합니다.
+
 ## 오픈소스 고지
 
 핵심 서드파티 런타임 컴포넌트와 배포 시 유의사항은 `THIRD_PARTY_LICENSES.md`를 참고하세요.

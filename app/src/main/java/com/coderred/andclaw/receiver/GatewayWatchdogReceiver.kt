@@ -10,6 +10,7 @@ import android.os.SystemClock
 import android.util.Log
 import com.coderred.andclaw.data.GatewayStatus
 import com.coderred.andclaw.data.PreferencesManager
+import com.coderred.andclaw.proroot.ExecutionRuntime
 import com.coderred.andclaw.service.GatewayService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,7 @@ class GatewayWatchdogReceiver : BroadcastReceiver() {
         private const val HEALTH_PROBE_TIMEOUT_MS = 20_000L
         private const val RUNNING_UNHEALTHY_RECOVERY_THRESHOLD = 3
         private const val STARTING_RECOVERY_GRACE_PERIOD_SECONDS = 300L
+        private const val PROOT_STARTING_RECOVERY_GRACE_PERIOD_SECONDS = 900L
         private val runningUnhealthyFailures = AtomicInteger(0)
 
         fun intervalMs(): Long = WATCHDOG_INTERVAL_MS
@@ -67,6 +69,13 @@ class GatewayWatchdogReceiver : BroadcastReceiver() {
             runningUnhealthyFailures.set(0)
         }
 
+        internal fun resolveStartingRecoveryGracePeriodSeconds(runtime: ExecutionRuntime): Long {
+            return when (runtime) {
+                ExecutionRuntime.PROOT -> PROOT_STARTING_RECOVERY_GRACE_PERIOD_SECONDS
+                ExecutionRuntime.PROROOT -> STARTING_RECOVERY_GRACE_PERIOD_SECONDS
+            }
+        }
+
         internal data class RecoveryDecision(
             val needsRecovery: Boolean,
             val nextRunningUnhealthyFailures: Int,
@@ -78,17 +87,18 @@ class GatewayWatchdogReceiver : BroadcastReceiver() {
             serviceActive: Boolean = true,
             startupAttemptActive: Boolean = false,
             startupUptimeSeconds: Long = 0L,
+            startupGracePeriodSeconds: Long = STARTING_RECOVERY_GRACE_PERIOD_SECONDS,
             previousRunningUnhealthyFailures: Int = 0,
             runningUnhealthyRecoveryThreshold: Int = RUNNING_UNHEALTHY_RECOVERY_THRESHOLD,
         ): RecoveryDecision {
-            if (startupAttemptActive && startupUptimeSeconds < STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
+            if (startupAttemptActive && startupUptimeSeconds < startupGracePeriodSeconds) {
                 // 시작 시도 중이고 grace period 내 → 서비스 재생성/재시작 중일 수 있으므로 복구하지 않음
                 return RecoveryDecision(
                     needsRecovery = false,
                     nextRunningUnhealthyFailures = 0,
                 )
             }
-            if (startupAttemptActive && startupUptimeSeconds >= STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
+            if (startupAttemptActive && startupUptimeSeconds >= startupGracePeriodSeconds) {
                 // grace period 초과 → 시작 실패로 판단
                 return RecoveryDecision(
                     needsRecovery = true,
@@ -125,7 +135,7 @@ class GatewayWatchdogReceiver : BroadcastReceiver() {
                     }
                 }
                 GatewayStatus.STARTING -> {
-                    if (startupUptimeSeconds >= STARTING_RECOVERY_GRACE_PERIOD_SECONDS) {
+                    if (startupUptimeSeconds >= startupGracePeriodSeconds) {
                         RecoveryDecision(
                             needsRecovery = true,
                             nextRunningUnhealthyFailures = 0,
@@ -205,6 +215,8 @@ class GatewayWatchdogReceiver : BroadcastReceiver() {
                 val startupAttemptAgeSeconds = processManager?.startupAttemptAgeSeconds()
                 val startupAttemptActive = startupAttemptAgeSeconds != null ||
                     (processManager == null && prefs.getGatewaySurvivorMetadata()?.startupAttemptActive == true)
+                val runtime = ExecutionRuntime.fromStorageValue(prefs.executionRuntime.first())
+                val startupGracePeriodSeconds = resolveStartingRecoveryGracePeriodSeconds(runtime)
                 val previousRunningUnhealthyFailures = runningUnhealthyFailures.get()
                 val runningHealthy = if (status == GatewayStatus.RUNNING) {
                     val healthy = processManager?.probeGatewayHealth(timeoutMs = HEALTH_PROBE_TIMEOUT_MS) == true
@@ -225,6 +237,7 @@ class GatewayWatchdogReceiver : BroadcastReceiver() {
                     serviceActive = serviceActive,
                     startupAttemptActive = startupAttemptActive,
                     startupUptimeSeconds = startupAttemptAgeSeconds ?: 0L,
+                    startupGracePeriodSeconds = startupGracePeriodSeconds,
                     previousRunningUnhealthyFailures = previousRunningUnhealthyFailures,
                 )
                 runningUnhealthyFailures.set(decision.nextRunningUnhealthyFailures)

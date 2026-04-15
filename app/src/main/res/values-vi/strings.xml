@@ -136,6 +136,40 @@ Khóa này không được gửi đến máy chủ của chúng tôi.</string>
 
     <!-- Tools -->
     <string name="settings_section_tools">Công cụ</string>
+    <string name="settings_section_advanced_users">Người dùng nâng cao</string>
+    <string name="settings_execution_runtime_title">Runtime thực thi</string>
+    <string name="settings_execution_runtime_desc">Chỉ đổi khi runtime mặc định có vấn đề tương thích.</string>
+    <string name="settings_execution_runtime_dialog_title">Runtime thực thi</string>
+    <string name="settings_execution_runtime_proroot">proroot (khởi động nhanh)</string>
+    <string name="settings_execution_runtime_proot">proot (ổn định)</string>
+    <string name="settings_openclaw_config_editor_entry">Trình chỉnh sửa cấu hình OpenClaw</string>
+    <string name="settings_openclaw_config_editor_entry_desc">Kiểm tra, chỉnh sửa và khôi phục bản sao lưu openclaw.json.</string>
+    <string name="settings_openclaw_config_editor_title">Trình chỉnh sửa cấu hình OpenClaw</string>
+    <string name="settings_openclaw_config_editor_save">Lưu</string>
+    <string name="settings_openclaw_config_editor_current_source">Nguồn hiện tại</string>
+    <string name="settings_openclaw_config_editor_backups">Bản sao lưu</string>
+    <string name="settings_openclaw_config_editor_no_backups">Không có bản sao lưu nào</string>
+    <string name="settings_openclaw_config_editor_missing">Không tìm thấy openclaw.json. Bạn có thể tạo tệp mới.</string>
+    <string name="settings_openclaw_config_editor_save_failed">Lỗi trình chỉnh sửa cấu hình OpenClaw</string>
+    <string name="settings_openclaw_extension_prune">Xóa extension OpenClaw không dùng</string>
+    <string name="settings_openclaw_extension_prune_desc">Chỉ dùng khi bạn đã chọn proot (ổn định) và gateway bị kẹt ở trạng thái đang khởi động, hoặc khi OpenClaw phản hồi chậm đi rõ rệt.</string>
+    <string name="settings_openclaw_extension_prune_running">Đang xóa extension OpenClaw không dùng…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">Xóa extension OpenClaw không dùng?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">Chỉ dùng khi bạn đã chọn proot (ổn định) và gateway bị kẹt ở trạng thái đang khởi động, hoặc khi OpenClaw phản hồi chậm đi rõ rệt. Những mục đã không còn tồn tại sẽ được tự động bỏ qua.</string>
+    <string name="settings_openclaw_extension_prune_done">Đã xóa extension OpenClaw không dùng</string>
+    <string name="settings_openclaw_extension_prune_failed">Không thể xóa extension OpenClaw không dùng</string>
+    <string name="settings_openclaw_extension_prune_failed_message">Không thể xóa các extension OpenClaw đã chọn sẵn.</string>
+    <string name="settings_openclaw_extension_prune_result_partial">Đã xóa: %1$d
+Đã không còn: %2$d
+Thất bại: %3$d
+Một số mục không thể xóa.</string>
+    <string name="settings_openclaw_extension_prune_result_summary">Đã xóa: %1$d
+Đã không còn: %2$d
+Thất bại: %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">Xóa</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">Chỉ dùng được khi đã chọn proot (ổn định).</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">Tải bản sao lưu này sẽ thay thế JSON hiện có trong trình chỉnh sửa. Bản sao lưu chỉ thực sự được áp dụng sau khi bạn lưu.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">Thay bản nháp hiện tại?</string>
     <string name="settings_brave_search_key">Khóa API Brave Search</string>
     <string name="settings_brave_search_desc">Kích hoạt tìm kiếm web cho tác nhân AI. Tùy chọn — để trống để tắt.</string>
     <string name="settings_brave_search_optional">Chưa cấu hình (tùy chọn)</string>
@@ -310,7 +344,6 @@ Trong khi khôi phục đang chạy, đừng đóng hoặc buộc dừng ứng d
     <string name="settings_transfer_export_success">Xuất tệp chuyển thiết bị hoàn tất.</string>
     <string name="settings_transfer_share_failed">Không thể chia sẻ tệp chuyển thiết bị.</string>
 </resources>
-
 
 
 

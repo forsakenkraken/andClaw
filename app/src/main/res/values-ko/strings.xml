@@ -147,6 +147,40 @@
 
     <!-- Tools -->
     <string name="settings_section_tools">도구</string>
+    <string name="settings_section_advanced_users">고급 사용자</string>
+    <string name="settings_execution_runtime_title">실행 런타임</string>
+    <string name="settings_execution_runtime_desc">기본 런타임에 호환성 문제가 있을 때만 변경하세요.</string>
+    <string name="settings_execution_runtime_dialog_title">실행 런타임</string>
+    <string name="settings_execution_runtime_proroot">proroot (빠른 실행)</string>
+    <string name="settings_execution_runtime_proot">proot (안정성)</string>
+    <string name="settings_openclaw_config_editor_entry">OpenClaw 설정 편집기</string>
+    <string name="settings_openclaw_config_editor_entry_desc">openclaw.json 백업을 확인, 수정, 복원합니다.</string>
+    <string name="settings_openclaw_config_editor_title">OpenClaw 설정 편집기</string>
+    <string name="settings_openclaw_config_editor_save">저장</string>
+    <string name="settings_openclaw_config_editor_current_source">현재 소스</string>
+    <string name="settings_openclaw_config_editor_backups">백업</string>
+    <string name="settings_openclaw_config_editor_no_backups">사용 가능한 백업이 없습니다</string>
+    <string name="settings_openclaw_config_editor_missing">openclaw.json 파일이 없습니다. 새 파일로 작성할 수 있습니다.</string>
+    <string name="settings_openclaw_config_editor_save_failed">OpenClaw 설정 편집기 오류</string>
+    <string name="settings_openclaw_extension_prune">미사용 OpenClaw 익스텐션 삭제</string>
+    <string name="settings_openclaw_extension_prune_desc">실행 런타임을 proot(안정성)으로 선택했고 게이트웨이가 시작 중에서 멈추거나 OpenClaw 반응이 눈에 띄게 느릴 때만 사용하세요.</string>
+    <string name="settings_openclaw_extension_prune_running">미사용 OpenClaw 익스텐션 삭제 중…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">미사용 OpenClaw 익스텐션을 삭제할까요?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">실행 런타임을 proot(안정성)으로 선택했고 게이트웨이가 시작 중에서 멈추거나 OpenClaw 반응이 눈에 띄게 느릴 때만 사용하세요. 이미 없는 항목은 자동으로 건너뜁니다.</string>
+    <string name="settings_openclaw_extension_prune_done">미사용 OpenClaw 익스텐션 삭제 완료</string>
+    <string name="settings_openclaw_extension_prune_failed">미사용 OpenClaw 익스텐션 삭제 실패</string>
+    <string name="settings_openclaw_extension_prune_failed_message">사전 지정된 OpenClaw 익스텐션을 삭제하지 못했습니다.</string>
+    <string name="settings_openclaw_extension_prune_result_partial">삭제됨: %1$d개
+이미 없음: %2$d개
+실패: %3$d개
+일부 항목은 삭제하지 못했습니다.</string>
+    <string name="settings_openclaw_extension_prune_result_summary">삭제됨: %1$d개
+이미 없음: %2$d개
+실패: %3$d개</string>
+    <string name="settings_openclaw_extension_prune_action">삭제</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">proot(안정성)을 선택했을 때만 사용할 수 있습니다.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">이 백업을 불러오면 현재 편집기 내용이 교체됩니다. 저장 전까지는 실제 복원되지 않습니다.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">현재 편집 내용을 바꿀까요?</string>
     <string name="settings_brave_search_key">Brave Search API 키</string>
     <string name="settings_brave_search_desc">AI 에이전트의 웹 검색을 활성화합니다. 선택 사항 — 비워두면 비활성화됩니다.</string>
     <string name="settings_brave_search_optional">미설정 (선택 사항)</string>

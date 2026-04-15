@@ -136,6 +136,40 @@
 
     <!-- Tools -->
     <string name="settings_section_tools">เครื่องมือ</string>
+    <string name="settings_section_advanced_users">ผู้ใช้ขั้นสูง</string>
+    <string name="settings_execution_runtime_title">รันไทม์การทำงาน</string>
+    <string name="settings_execution_runtime_desc">เปลี่ยนเฉพาะเมื่อรันไทม์เริ่มต้นมีปัญหาความเข้ากันได้เท่านั้น</string>
+    <string name="settings_execution_runtime_dialog_title">รันไทม์การทำงาน</string>
+    <string name="settings_execution_runtime_proroot">proroot (เริ่มทำงานเร็ว)</string>
+    <string name="settings_execution_runtime_proot">proot (เสถียรภาพ)</string>
+    <string name="settings_openclaw_config_editor_entry">ตัวแก้ไขการตั้งค่า OpenClaw</string>
+    <string name="settings_openclaw_config_editor_entry_desc">ตรวจสอบ แก้ไข และกู้คืนข้อมูลสำรองของ openclaw.json</string>
+    <string name="settings_openclaw_config_editor_title">ตัวแก้ไขการตั้งค่า OpenClaw</string>
+    <string name="settings_openclaw_config_editor_save">บันทึก</string>
+    <string name="settings_openclaw_config_editor_current_source">แหล่งที่มาปัจจุบัน</string>
+    <string name="settings_openclaw_config_editor_backups">ข้อมูลสำรอง</string>
+    <string name="settings_openclaw_config_editor_no_backups">ไม่มีข้อมูลสำรอง</string>
+    <string name="settings_openclaw_config_editor_missing">ไม่พบ openclaw.json คุณสามารถสร้างไฟล์ใหม่ได้</string>
+    <string name="settings_openclaw_config_editor_save_failed">ข้อผิดพลาดของตัวแก้ไขการตั้งค่า OpenClaw</string>
+    <string name="settings_openclaw_extension_prune">ลบส่วนขยาย OpenClaw ที่ไม่ได้ใช้</string>
+    <string name="settings_openclaw_extension_prune_desc">ใช้เฉพาะเมื่อเลือก proot (เสถียรภาพ) แล้ว gateway ค้างอยู่ที่สถานะกำลังเริ่มทำงาน หรือเมื่อ OpenClaw ตอบสนองช้าลงอย่างเห็นได้ชัด</string>
+    <string name="settings_openclaw_extension_prune_running">กำลังลบส่วนขยาย OpenClaw ที่ไม่ได้ใช้…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">ลบส่วนขยาย OpenClaw ที่ไม่ได้ใช้หรือไม่?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">ใช้เฉพาะเมื่อเลือก proot (เสถียรภาพ) แล้ว gateway ค้างอยู่ที่สถานะกำลังเริ่มทำงาน หรือเมื่อ OpenClaw ตอบสนองช้าลงอย่างเห็นได้ชัด รายการที่ไม่มีอยู่แล้วจะถูกข้ามให้อัตโนมัติ</string>
+    <string name="settings_openclaw_extension_prune_done">ลบส่วนขยาย OpenClaw ที่ไม่ได้ใช้แล้ว</string>
+    <string name="settings_openclaw_extension_prune_failed">ลบส่วนขยาย OpenClaw ที่ไม่ได้ใช้ไม่สำเร็จ</string>
+    <string name="settings_openclaw_extension_prune_failed_message">ไม่สามารถลบส่วนขยาย OpenClaw ที่กำหนดไว้ล่วงหน้าได้</string>
+    <string name="settings_openclaw_extension_prune_result_partial">ลบแล้ว: %1$d
+ไม่มีอยู่แล้ว: %2$d
+ล้มเหลว: %3$d
+มีบางรายการที่ลบไม่สำเร็จ</string>
+    <string name="settings_openclaw_extension_prune_result_summary">ลบแล้ว: %1$d
+ไม่มีอยู่แล้ว: %2$d
+ล้มเหลว: %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">ลบ</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">ใช้ได้เฉพาะเมื่อเลือก proot (เสถียรภาพ) เท่านั้น</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">การโหลดข้อมูลสำรองนี้จะเขียนทับ JSON ปัจจุบันในตัวแก้ไข และจะยังไม่ถูกนำไปใช้จริงจนกว่าจะกดบันทึก</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">แทนที่ฉบับร่างปัจจุบันหรือไม่?</string>
     <string name="settings_brave_search_key">คีย์ API Brave Search</string>
     <string name="settings_brave_search_desc">เปิดใช้งานการค้นหาเว็บสำหรับเอเจนต์ AI ไม่บังคับ — ปล่อยว่างเพื่อปิดใช้งาน</string>
     <string name="settings_brave_search_optional">ยังไม่ได้กำหนดค่า (ไม่บังคับ)</string>
@@ -310,7 +344,6 @@
     <string name="settings_transfer_export_success">ส่งออกไฟล์ถ่ายโอนเสร็จแล้ว</string>
     <string name="settings_transfer_share_failed">ไม่สามารถแชร์ไฟล์ถ่ายโอนได้</string>
 </resources>
-
 
 
 

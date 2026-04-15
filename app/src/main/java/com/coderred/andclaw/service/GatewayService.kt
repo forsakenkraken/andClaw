@@ -22,6 +22,7 @@ import com.coderred.andclaw.data.GatewayStatus
 import com.coderred.andclaw.data.PairingRequest
 import com.coderred.andclaw.data.PreferencesManager
 import com.coderred.andclaw.proroot.BundleUpdateOutcome
+import com.coderred.andclaw.proroot.ExecutionRuntime
 import com.coderred.andclaw.proroot.ProcessManager
 import com.coderred.andclaw.receiver.GatewayWatchdogReceiver
 import kotlinx.coroutines.CoroutineScope
@@ -67,6 +68,8 @@ class GatewayService : Service() {
         private const val START_WAKE_LOCK_TIMEOUT_BACKGROUND_MS = 26L * 60L * 1000L
         private const val START_TERMINAL_WAIT_TIMEOUT_MS = 300_000L
         private const val RESTART_WAKE_LOCK_TIMEOUT_MS = 300_000L
+        private const val PROOT_START_TERMINAL_WAIT_TIMEOUT_MS = 900_000L
+        private const val PROOT_RESTART_WAKE_LOCK_TIMEOUT_MS = 900_000L
         private const val ATTACH_HEALTH_PROBE_TIMEOUT_MS = 8_000L
         private const val STICKY_PREFLIGHT_HEALTH_PROBE_TIMEOUT_MS = 2_500L
         private const val WHATSAPP_LOGIN_WAKE_LOCK_TIMEOUT_MS = 4L * 60L * 1000L
@@ -88,6 +91,20 @@ class GatewayService : Service() {
         private const val STICKY_RECOVERY_TRIGGER_SOURCE = "system:sticky_recovery"
         private const val DIAGNOSTIC_SOURCE_MAX_LENGTH = 80
         const val VALIDATION_RESULT_FILE_NAME = "gateway-runtime-validation.json"
+
+        internal fun resolveGatewayStartupTerminalTimeoutMs(runtime: ExecutionRuntime): Long {
+            return when (runtime) {
+                ExecutionRuntime.PROOT -> PROOT_START_TERMINAL_WAIT_TIMEOUT_MS
+                ExecutionRuntime.PROROOT -> START_TERMINAL_WAIT_TIMEOUT_MS
+            }
+        }
+
+        internal fun resolveGatewayRestartTimeoutMs(runtime: ExecutionRuntime): Long {
+            return when (runtime) {
+                ExecutionRuntime.PROOT -> PROOT_RESTART_WAKE_LOCK_TIMEOUT_MS
+                ExecutionRuntime.PROROOT -> RESTART_WAKE_LOCK_TIMEOUT_MS
+            }
+        }
 
         private var _instance: GatewayService? = null
         private var retainedProcessManager: ProcessManager? = null
@@ -583,8 +600,10 @@ class GatewayService : Service() {
                     return@runAction
                 }
                 if (shouldRejoinStartup) {
-                    withTimedWakeLock(START_TERMINAL_WAIT_TIMEOUT_MS) {
-                        val finalStatus = awaitGatewayStartupTerminalState(START_TERMINAL_WAIT_TIMEOUT_MS)
+                    val runtime = resolveExecutionRuntimeForStartup()
+                    val startupTimeoutMs = resolveGatewayStartupTerminalTimeoutMs(runtime)
+                    withTimedWakeLock(startupTimeoutMs) {
+                        val finalStatus = awaitGatewayStartupTerminalState(startupTimeoutMs)
                         if (!isActionCurrent(actionToken)) return@withTimedWakeLock
                         handleStartupOutcome(finalStatus, actionToken)
                     }
@@ -929,12 +948,14 @@ class GatewayService : Service() {
         val app = application as AndClawApp
         val bundleUpdateRequired = runCatching { app.setupManager.isBundleUpdateRequired() }
             .getOrDefault(true)
+        val runtime = resolveExecutionRuntimeForStartup()
+        val startupTimeoutMs = resolveGatewayStartupTerminalTimeoutMs(runtime)
 
         val startWakeLockTimeoutMs = resolveStartWakeLockTimeoutMs(
             fromWatchdog = fromWatchdog,
             userInitiated = userInitiated,
             bundleUpdateRequired = bundleUpdateRequired,
-        )
+        ).coerceAtLeast(startupTimeoutMs)
 
         // 사용자가 START를 요청한 순간부터 desired-running 상태를 유지한다.
         // 단, bundle update가 끝나기 전에는 watchdog를 예약하지 않아
@@ -1053,7 +1074,7 @@ class GatewayService : Service() {
                 probePhase = pm.gatewayProbePhase(isRestart = false),
             )
 
-            val finalStatus = awaitGatewayStartupTerminalState(START_TERMINAL_WAIT_TIMEOUT_MS)
+            val finalStatus = awaitGatewayStartupTerminalState(startupTimeoutMs)
             if (!isActionCurrent(actionToken)) return@withTimedWakeLock
             handleStartupOutcome(finalStatus, actionToken)
         }
@@ -1102,8 +1123,10 @@ class GatewayService : Service() {
         if (!setDesiredRunningAndWatchdog(shouldRun = true, actionToken = actionToken)) return
         pm.markStartupAttemptStarted()
         updateGatewaySurvivorMetadata(startupAttemptActive = true)
+        val runtime = resolveExecutionRuntimeForStartup()
+        val restartTimeoutMs = resolveGatewayRestartTimeoutMs(runtime)
 
-        withTimedWakeLock(RESTART_WAKE_LOCK_TIMEOUT_MS) {
+        withTimedWakeLock(restartTimeoutMs) {
             if (!isActionCurrent(actionToken)) return@withTimedWakeLock
 
             prefs.ensureCurrentProviderModelSelection()
@@ -1148,7 +1171,7 @@ class GatewayService : Service() {
                 launchConfig.memorySearchApiKey,
                 probePhase = pm.gatewayProbePhase(isRestart = true),
             )
-            val finalStatus = awaitGatewayStartupTerminalState(RESTART_WAKE_LOCK_TIMEOUT_MS)
+            val finalStatus = awaitGatewayStartupTerminalState(restartTimeoutMs)
             if (!isActionCurrent(actionToken)) return@withTimedWakeLock
             handleStartupOutcome(finalStatus, actionToken)
         }
@@ -1305,6 +1328,10 @@ class GatewayService : Service() {
             )
         }
         return finalState?.status
+    }
+
+    private suspend fun resolveExecutionRuntimeForStartup(): ExecutionRuntime {
+        return ExecutionRuntime.fromStorageValue(prefs.executionRuntime.first())
     }
 
     private fun runAction(

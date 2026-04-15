@@ -137,6 +137,40 @@ Non viene inviata ai nostri server.</string>
 
     <!-- Tools -->
     <string name="settings_section_tools">Strumenti</string>
+    <string name="settings_section_advanced_users">Utenti avanzati</string>
+    <string name="settings_execution_runtime_title">Runtime di esecuzione</string>
+    <string name="settings_execution_runtime_desc">Cambialo solo se il runtime predefinito ha problemi di compatibilità.</string>
+    <string name="settings_execution_runtime_dialog_title">Runtime di esecuzione</string>
+    <string name="settings_execution_runtime_proroot">proroot (avvio rapido)</string>
+    <string name="settings_execution_runtime_proot">proot (stabilità)</string>
+    <string name="settings_openclaw_config_editor_entry">Editor configurazione OpenClaw</string>
+    <string name="settings_openclaw_config_editor_entry_desc">Ispeziona, modifica e ripristina i backup di openclaw.json.</string>
+    <string name="settings_openclaw_config_editor_title">Editor configurazione OpenClaw</string>
+    <string name="settings_openclaw_config_editor_save">Salva</string>
+    <string name="settings_openclaw_config_editor_current_source">Origine corrente</string>
+    <string name="settings_openclaw_config_editor_backups">Backup</string>
+    <string name="settings_openclaw_config_editor_no_backups">Nessun backup disponibile</string>
+    <string name="settings_openclaw_config_editor_missing">openclaw.json non è stato trovato. Puoi creare un nuovo file.</string>
+    <string name="settings_openclaw_config_editor_save_failed">Errore dell’editor configurazione OpenClaw</string>
+    <string name="settings_openclaw_extension_prune">Elimina le estensioni OpenClaw inutilizzate</string>
+    <string name="settings_openclaw_extension_prune_desc">Usalo solo se hai scelto proot (stabilità) e il gateway resta bloccato durante l’avvio, oppure se OpenClaw diventa visibilmente più lento a rispondere.</string>
+    <string name="settings_openclaw_extension_prune_running">Eliminazione delle estensioni OpenClaw inutilizzate…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">Eliminare le estensioni OpenClaw inutilizzate?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">Usalo solo se hai scelto proot (stabilità) e il gateway resta bloccato durante l’avvio, oppure se OpenClaw diventa visibilmente più lento a rispondere. Gli elementi già mancanti verranno ignorati automaticamente.</string>
+    <string name="settings_openclaw_extension_prune_done">Estensioni OpenClaw inutilizzate eliminate</string>
+    <string name="settings_openclaw_extension_prune_failed">Impossibile eliminare le estensioni OpenClaw inutilizzate</string>
+    <string name="settings_openclaw_extension_prune_failed_message">Impossibile eliminare le estensioni OpenClaw preselezionate.</string>
+    <string name="settings_openclaw_extension_prune_result_partial">Eliminate: %1$d
+Già assenti: %2$d
+Fallite: %3$d
+Alcuni elementi non sono stati rimossi.</string>
+    <string name="settings_openclaw_extension_prune_result_summary">Eliminate: %1$d
+Già assenti: %2$d
+Fallite: %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">Elimina</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">Disponibile solo quando è selezionato proot (stabilità).</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">Caricare questo backup sostituirà il JSON attualmente presente nell’editor. Il backup non verrà davvero applicato finché non salvi.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">Sostituire la bozza corrente?</string>
     <string name="settings_brave_search_key">Chiave API Brave Search</string>
     <string name="settings_brave_search_desc">Abilita la ricerca web per l\'agente AI. Opzionale — lasciare vuoto per disabilitare.</string>
     <string name="settings_brave_search_optional">Non configurato (opzionale)</string>
@@ -311,7 +345,6 @@ Non chiudere né forzare l’arresto dell’app mentre il ripristino è in corso
     <string name="settings_transfer_export_success">Esportazione del trasferimento completata.</string>
     <string name="settings_transfer_share_failed">Impossibile condividere il file di trasferimento.</string>
 </resources>
-
 
 
 

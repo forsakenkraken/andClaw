@@ -137,6 +137,40 @@
 
     <!-- Tools -->
     <string name="settings_section_tools">ツール</string>
+    <string name="settings_section_advanced_users">上級ユーザー</string>
+    <string name="settings_execution_runtime_title">実行ランタイム</string>
+    <string name="settings_execution_runtime_desc">標準ランタイムに互換性の問題がある場合のみ変更してください。</string>
+    <string name="settings_execution_runtime_dialog_title">実行ランタイム</string>
+    <string name="settings_execution_runtime_proroot">proroot（高速起動）</string>
+    <string name="settings_execution_runtime_proot">proot（安定性）</string>
+    <string name="settings_openclaw_config_editor_entry">OpenClaw設定エディター</string>
+    <string name="settings_openclaw_config_editor_entry_desc">openclaw.json のバックアップを確認、編集、復元します。</string>
+    <string name="settings_openclaw_config_editor_title">OpenClaw設定エディター</string>
+    <string name="settings_openclaw_config_editor_save">保存</string>
+    <string name="settings_openclaw_config_editor_current_source">現在のソース</string>
+    <string name="settings_openclaw_config_editor_backups">バックアップ</string>
+    <string name="settings_openclaw_config_editor_no_backups">利用可能なバックアップはありません</string>
+    <string name="settings_openclaw_config_editor_missing">openclaw.json が見つかりません。新しいファイルとして作成できます。</string>
+    <string name="settings_openclaw_config_editor_save_failed">OpenClaw設定エディターのエラー</string>
+    <string name="settings_openclaw_extension_prune">未使用のOpenClaw拡張を削除</string>
+    <string name="settings_openclaw_extension_prune_desc">実行ランタイムに proot（安定性）を選んでいて、gateway が起動中のまま止まるとき、または OpenClaw の反応が明らかに遅いときだけ使ってください。</string>
+    <string name="settings_openclaw_extension_prune_running">未使用のOpenClaw拡張を削除中…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">未使用のOpenClaw拡張を削除しますか？</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">実行ランタイムに proot（安定性）を選んでいて、gateway が起動中のまま止まるとき、または OpenClaw の反応が明らかに遅いときだけ使ってください。すでに存在しない項目は自動的にスキップされます。</string>
+    <string name="settings_openclaw_extension_prune_done">未使用のOpenClaw拡張を削除しました</string>
+    <string name="settings_openclaw_extension_prune_failed">未使用のOpenClaw拡張を削除できませんでした</string>
+    <string name="settings_openclaw_extension_prune_failed_message">事前指定された OpenClaw 拡張を削除できませんでした。</string>
+    <string name="settings_openclaw_extension_prune_result_partial">削除: %1$d
+既になし: %2$d
+失敗: %3$d
+一部の項目を削除できませんでした。</string>
+    <string name="settings_openclaw_extension_prune_result_summary">削除: %1$d
+既になし: %2$d
+失敗: %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">削除</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">proot（安定性）を選択している場合のみ利用できます。</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">このバックアップを読み込むと、現在エディター内のJSONが置き換わります。保存するまでは実際には復元されません。</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">現在の編集内容を置き換えますか？</string>
     <string name="settings_brave_search_key">Brave Search APIキー</string>
     <string name="settings_brave_search_desc">AIエージェントのウェブ検索を有効にします。任意 — 空欄で無効化されます。</string>
     <string name="settings_brave_search_optional">未設定（任意）</string>
@@ -311,7 +345,6 @@
     <string name="settings_transfer_export_success">転送ファイルの書き出しが完了しました。</string>
     <string name="settings_transfer_share_failed">転送ファイルを共有できませんでした。</string>
 </resources>
-
 
 
 

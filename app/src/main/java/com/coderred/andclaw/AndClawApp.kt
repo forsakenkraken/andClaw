@@ -24,7 +24,7 @@ class AndClawApp : Application() {
         OpenClawModelCatalogReader.init(this)
         preferencesManager = PreferencesManager(this)
         prorootManager = ProrootManager(this)
-        prorootManager.setupHookLibrary()
+        prorootManager.prepareSelectedRuntime()
         setupManager = SetupManager(this, prorootManager, preferencesManager)
         processManager = ProcessManager(prorootManager)
         GatewayService.bindRetainedProcessManager(processManager)

@@ -137,6 +137,40 @@ Elle n’est pas envoyée à nos serveurs.</string>
 
     <!-- Tools -->
     <string name="settings_section_tools">Outils</string>
+    <string name="settings_section_advanced_users">Utilisateurs avancés</string>
+    <string name="settings_execution_runtime_title">Runtime d’exécution</string>
+    <string name="settings_execution_runtime_desc">À modifier seulement si le runtime par défaut a des problèmes de compatibilité.</string>
+    <string name="settings_execution_runtime_dialog_title">Runtime d’exécution</string>
+    <string name="settings_execution_runtime_proroot">proroot (démarrage rapide)</string>
+    <string name="settings_execution_runtime_proot">proot (stabilité)</string>
+    <string name="settings_openclaw_config_editor_entry">Éditeur de configuration OpenClaw</string>
+    <string name="settings_openclaw_config_editor_entry_desc">Inspectez, modifiez et restaurez les sauvegardes de openclaw.json.</string>
+    <string name="settings_openclaw_config_editor_title">Éditeur de configuration OpenClaw</string>
+    <string name="settings_openclaw_config_editor_save">Enregistrer</string>
+    <string name="settings_openclaw_config_editor_current_source">Source actuelle</string>
+    <string name="settings_openclaw_config_editor_backups">Sauvegardes</string>
+    <string name="settings_openclaw_config_editor_no_backups">Aucune sauvegarde disponible</string>
+    <string name="settings_openclaw_config_editor_missing">openclaw.json est introuvable. Vous pouvez créer un nouveau fichier.</string>
+    <string name="settings_openclaw_config_editor_save_failed">Erreur de l’éditeur de configuration OpenClaw</string>
+    <string name="settings_openclaw_extension_prune">Supprimer les extensions OpenClaw inutilisées</string>
+    <string name="settings_openclaw_extension_prune_desc">À utiliser uniquement si vous avez choisi proot (stabilité) et que le gateway reste bloqué au démarrage, ou si OpenClaw devient nettement plus lent à répondre.</string>
+    <string name="settings_openclaw_extension_prune_running">Suppression des extensions OpenClaw inutilisées…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">Supprimer les extensions OpenClaw inutilisées ?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">À utiliser uniquement si vous avez choisi proot (stabilité) et que le gateway reste bloqué au démarrage, ou si OpenClaw devient nettement plus lent à répondre. Les éléments déjà absents seront ignorés automatiquement.</string>
+    <string name="settings_openclaw_extension_prune_done">Extensions OpenClaw inutilisées supprimées</string>
+    <string name="settings_openclaw_extension_prune_failed">Échec de la suppression des extensions OpenClaw inutilisées</string>
+    <string name="settings_openclaw_extension_prune_failed_message">Impossible de supprimer les extensions OpenClaw présélectionnées.</string>
+    <string name="settings_openclaw_extension_prune_result_partial">Supprimées : %1$d
+Déjà absentes : %2$d
+Échecs : %3$d
+Certains éléments n’ont pas pu être supprimés.</string>
+    <string name="settings_openclaw_extension_prune_result_summary">Supprimées : %1$d
+Déjà absentes : %2$d
+Échecs : %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">Supprimer</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">Disponible uniquement lorsque proot (stabilité) est sélectionné.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">Le chargement de cette sauvegarde remplacera le JSON actuellement présent dans l’éditeur. La sauvegarde ne sera réellement appliquée qu’après l’enregistrement.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">Remplacer le brouillon actuel ? </string>
     <string name="settings_brave_search_key">Clé API Brave Search</string>
     <string name="settings_brave_search_desc">Active la recherche web pour l\'agent IA. Optionnel — laisser vide pour désactiver.</string>
     <string name="settings_brave_search_optional">Non configuré (optionnel)</string>
@@ -311,7 +345,6 @@ Ne fermez pas l’application et ne forcez pas son arrêt tant que la récupéra
     <string name="settings_transfer_export_success">Export du fichier de transfert terminé.</string>
     <string name="settings_transfer_share_failed">Impossible de partager le fichier de transfert.</string>
 </resources>
-
 
 
 

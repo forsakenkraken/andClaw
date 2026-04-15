@@ -12,10 +12,12 @@ import com.coderred.andclaw.proroot.installer.TarInstallSpec
 import com.coderred.andclaw.proroot.installer.TarInstaller
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.json.JSONObject
@@ -111,16 +113,27 @@ class SetupManager(
         try {
             // ─── Step 1: proroot 바이너리 확인 ───
             updateStep(SetupStep.CHECKING_PROROOT, 0.02f)
-            log(">> Checking proroot binary...")
-            if (!prorootManager.isProrootAvailable) {
+            val runtimeSnapshot = preferencesManager?.executionRuntime?.first()?.let {
+                ExecutionRuntime.fromStorageValue(it)
+            } ?: ExecutionRuntime.PROROOT
+            log(">> Checking ${runtimeSnapshot.storageValue} runtime...")
+            if (!prorootManager.isRuntimeAvailable(runtimeSnapshot)) {
                 throw SetupException(
-                "Cannot find proroot binary (libproroot.so).\n" +
+                "Cannot find selected runtime (${runtimeSnapshot.storageValue}).\n" +
                         "Run scripts/setup-assets.sh and build again."
                 )
             }
-            log("   proroot: ${prorootManager.prorootBinaryPath}")
-            prorootManager.setupHookLibrary()
-            log("   Hook library ready: ${prorootManager.hookLibPath}")
+            val runtimeBinary = when (runtimeSnapshot) {
+                ExecutionRuntime.PROOT -> prorootManager.prootBinaryPath
+                ExecutionRuntime.PROROOT -> prorootManager.prorootBinaryPath
+            }
+            log("   ${runtimeSnapshot.storageValue}: $runtimeBinary")
+            prorootManager.prepareRuntime(runtimeSnapshot)
+            if (runtimeSnapshot == ExecutionRuntime.PROROOT) {
+                log("   Hook library ready: ${prorootManager.hookLibPath}")
+            } else {
+                log("   Legacy proot libs ready: ${prorootManager.libLinksDir}")
+            }
             log("   Binary ready")
 
             // .proot-meta → .proroot-meta migration (proot → proroot 업데이트 호환)
@@ -149,7 +162,7 @@ class SetupManager(
             configureRootfs()
 
             // ─── Step 4: Node.js 추출 (assets -> rootfs/usr/local) ───
-            if (shouldExtractNodeJs()) {
+            if (shouldExtractNodeJs(runtimeSnapshot)) {
                 extractNodeJsFromAssets()
             } else {
                 log(">> Node.js already installed, skipping")
@@ -166,7 +179,7 @@ class SetupManager(
 
             // ─── Step 6: OpenClaw 설치 ───
             if (!prorootManager.isOpenClawInstalled || isOpenClawOutdated()) {
-                installOpenClaw()
+                installOpenClaw(runtimeSnapshot)
             } else {
                 log(">> OpenClaw already installed (v${getInstalledVersion(openclawVersionFile)}), skipping")
                 updateStep(SetupStep.INSTALLING_CHROMIUM, 0.72f)
@@ -186,7 +199,7 @@ class SetupManager(
 
             // ─── Step 9: 검증 ───
             updateStep(SetupStep.VERIFYING, 0.92f)
-            verify()
+            verify(runtimeSnapshot)
 
             // ─── Step 10: OpenClaw 초기 설정 (ensureOpenClawConfig에서 처리) ───
             log(">> OpenClaw config will be created on first gateway start")
@@ -425,7 +438,7 @@ class SetupManager(
 
     // ── Step 6: OpenClaw 설치 ──
 
-    private suspend fun installOpenClaw() = withContext(Dispatchers.IO) {
+    private suspend fun installOpenClaw(runtime: ExecutionRuntime) = withContext(Dispatchers.IO) {
         updateStep(SetupStep.INSTALLING_OPENCLAW, 0.57f)
         updateBytes(0, 0)
         log(">> Installing OpenClaw...")
@@ -468,7 +481,7 @@ class SetupManager(
             },
         )
 
-        ensureOpenClawExecutable()
+        ensureOpenClawExecutable(runtime)
 
         log("   OpenClaw installation complete")
 
@@ -504,6 +517,11 @@ class SetupManager(
         _state.value = _state.value.copy(isInProgress = true, error = null)
 
         try {
+            val runtimeSnapshot = currentConfiguredRuntime()
+            if (!prorootManager.isRuntimeAvailable(runtimeSnapshot)) {
+                throw SetupException("Cannot find selected runtime (${runtimeSnapshot.storageValue}).")
+            }
+            prorootManager.prepareRuntime(runtimeSnapshot)
             log(">> OpenClaw manual sync (full reinstall)...")
 
             // 기존 openclaw 디렉토리 삭제 (이전 번들의 잔존 파일 방지)
@@ -533,9 +551,8 @@ class SetupManager(
             )
 
             updateStep(SetupStep.VERIFYING, 0.95f)
-            prorootManager.setupHookLibrary()
-            log("   Hook library refreshed before OpenClaw verification")
-            ensureOpenClawExecutable()
+            log("   Runtime prepared before OpenClaw verification")
+            ensureOpenClawExecutable(runtimeSnapshot)
             saveVersion(openclawVersionFile)
             saveFingerprint(openclawFingerprintFile, ProrootManager.OPENCLAW_ASSET)
             updateStep(SetupStep.COMPLETE, 1.0f)
@@ -615,7 +632,7 @@ class SetupManager(
         return if (parts.isEmpty()) null else parts
     }
 
-    private suspend fun ensureOpenClawExecutable() {
+    private suspend fun ensureOpenClawExecutable(runtime: ExecutionRuntime) {
         val openClawBin = File(prorootManager.rootfsDir, "usr/local/bin/openclaw")
         if (!openClawBin.exists()) {
             val parentDir = openClawBin.parentFile
@@ -636,7 +653,10 @@ class SetupManager(
                 "OpenClaw executable is not executable after install: ${openClawBin.path}",
             )
         }
-        val validationResult = runOpenClawValidationInCurrentProcess(requirePatchedNodeOptions = false)
+        val validationResult = runOpenClawValidationInCurrentProcess(
+            requirePatchedNodeOptions = false,
+            runtime = runtime,
+        )
         if (validationResult == null || validationResult.exitCode != 0) {
             throw SetupException(
                 "OpenClaw executable validation failed: ${openClawBin.path}" +
@@ -718,10 +738,11 @@ class SetupManager(
         includeOpenClawAssetUpdate: Boolean = false,
         forceOpenClawReinstall: Boolean = false,
         includeNodeRuntimeUpdate: Boolean = true,
+        runtime: ExecutionRuntime = currentConfiguredRuntime(),
     ) = withContext(Dispatchers.IO) {
         val appVersion = getAppVersionCode()
 
-        if (includeNodeRuntimeUpdate && shouldExtractNodeJs()) {
+        if (includeNodeRuntimeUpdate && shouldExtractNodeJs(runtime)) {
             android.util.Log.i(
                 "SetupManager",
                 "Node.js update required (installed=${getInstalledVersion(nodeVersionFile)}, app=$appVersion)",
@@ -744,7 +765,7 @@ class SetupManager(
         if (openClawUpdateRequired) {
             android.util.Log.i("SetupManager", "OpenClaw update required (installed=${getInstalledVersion(openclawVersionFile)}, app=$appVersion)")
             onStepChanged?.invoke(SetupStep.INSTALLING_OPENCLAW)
-            installOpenClaw()
+            installOpenClaw(runtime)
             android.util.Log.i("SetupManager", "OpenClaw update complete")
         }
 
@@ -809,6 +830,15 @@ class SetupManager(
         forceOpenClawReinstall: Boolean = false,
     ): BundleUpdateAttemptResult = withContext(Dispatchers.IO) {
         val appVersion = getAppVersionCode()
+        val runtimeSnapshot = currentConfiguredRuntime()
+        if (!prorootManager.isRuntimeAvailable(runtimeSnapshot)) {
+            return@withContext BundleUpdateAttemptResult(
+                outcome = BundleUpdateOutcome.FAILED,
+                failureType = BundleUpdateFailureType.UNKNOWN,
+                errorMessage = "Cannot find selected runtime (${runtimeSnapshot.storageValue}).",
+            )
+        }
+        prorootManager.prepareRuntime(runtimeSnapshot)
         val prefs = preferencesManager
         var consumeManualRetryOnFailure = false
         val failure = prefs?.getBundleUpdateFailure(appVersion)?.let(::toFailureState)
@@ -829,7 +859,7 @@ class SetupManager(
 
         return@withContext try {
             val result = withTimeout(timeoutMs) {
-                val nodeRepairRequired = shouldExtractNodeJs()
+                val nodeRepairRequired = shouldExtractNodeJs(runtimeSnapshot)
                 val updateRequired = forceOpenClawReinstall ||
                     nodeRepairRequired ||
                     isBundleUpdateRequired(
@@ -898,6 +928,7 @@ class SetupManager(
                     includeOpenClawAssetUpdate = includeOpenClawAssetUpdate,
                     forceOpenClawReinstall = forceOpenClawReinstall,
                     includeNodeRuntimeUpdate = false,
+                    runtime = runtimeSnapshot,
                 )
 
                 BundleUpdateAttemptResult(
@@ -1003,9 +1034,9 @@ class SetupManager(
         file.writeText(getAppVersionCode().toString())
     }
 
-    private fun getInstalledNodeVersion(): String {
+    private fun getInstalledNodeVersion(runtime: ExecutionRuntime = currentConfiguredRuntime()): String {
         return runCatching {
-            prorootManager.executeAndCapture("node --version")?.trim().orEmpty()
+            prorootManager.executeAndCapture("node --version", runtime)?.trim().orEmpty()
         }.getOrDefault("")
     }
 
@@ -1052,9 +1083,9 @@ class SetupManager(
         )
     }
 
-    internal fun shouldExtractNodeJs(): Boolean {
+    internal fun shouldExtractNodeJs(runtime: ExecutionRuntime = currentConfiguredRuntime()): Boolean {
         if (shouldExtractNodeJsByMetadata()) return true
-        if (getInstalledNodeVersion() != ProrootManager.NODEJS_VERSION) return true
+        if (getInstalledNodeVersion(runtime) != ProrootManager.NODEJS_VERSION) return true
         return false
     }
 
@@ -1236,21 +1267,24 @@ class SetupManager(
 
     // ── Step 9: 검증 ──
 
-    private suspend fun verify() = withContext(Dispatchers.IO) {
+    private suspend fun verify(runtime: ExecutionRuntime) = withContext(Dispatchers.IO) {
         log(">> Verifying installation...")
 
-        log("   Checking proroot...")
-        if (executeInProot("echo 'proroot OK'") != 0) {
-            throw SetupException("proroot check failed")
+        log("   Checking ${runtime.storageValue}...")
+        if (executeInProot("echo '${runtime.storageValue} OK'", runtime) != 0) {
+            throw SetupException("${runtime.storageValue} check failed")
         }
 
         log("   Checking Node.js...")
-        if (executeInProot("node --version") != 0) {
+        if (executeInProot("node --version", runtime) != 0) {
             throw SetupException("Node.js check failed")
         }
 
         log("   Checking OpenClaw...")
-        val openClawValidationResult = runOpenClawValidationInCurrentProcess(requirePatchedNodeOptions = true)
+        val openClawValidationResult = runOpenClawValidationInCurrentProcess(
+            requirePatchedNodeOptions = true,
+            runtime = runtime,
+        )
         if (openClawValidationResult == null || openClawValidationResult.exitCode != 0 || !prorootManager.isOpenClawInstalled) {
             throw SetupException("OpenClaw validation failed")
         }
@@ -1268,14 +1302,15 @@ class SetupManager(
 
     // ── 유틸 ──
 
-    private fun executeInProot(command: String): Int {
-        val cmd = prorootManager.buildProrootCommand(command)
+    private fun executeInProot(command: String, runtime: ExecutionRuntime): Int {
+        val cmd = prorootManager.buildProrootCommand(command, runtime)
         val env = prorootManager.buildEnvironment(
             mapOf(
                 "HOME" to "/root",
                 "PATH" to "/usr/local/bin:/usr/bin:/bin",
                 "LANG" to "C.UTF-8",
             ),
+            runtime = runtime,
         )
 
         val pb = ProcessBuilder(cmd).redirectErrorStream(true)
@@ -1291,7 +1326,10 @@ class SetupManager(
         return process.waitFor()
     }
 
-    internal fun runOpenClawValidationInCurrentProcess(requirePatchedNodeOptions: Boolean): ProrootManager.CommandResult? {
+    internal fun runOpenClawValidationInCurrentProcess(
+        requirePatchedNodeOptions: Boolean,
+        runtime: ExecutionRuntime = currentConfiguredRuntime(),
+    ): ProrootManager.CommandResult? {
         val validationCommand = buildString {
             append("export UV_USE_IO_URING=0 && ")
             if (requirePatchedNodeOptions) {
@@ -1310,6 +1348,7 @@ class SetupManager(
                 extraEnv = mapOf("PROROOT_PROBE_PHASE" to phase),
                 wrapInHostShell = false,
                 captureViaTempFile = true,
+                runtime = runtime,
             )
             log("   Validation probe[$index]: phase=$phase exit=${probeResult?.exitCode} cmd=$command")
             probeResult?.output?.lineSequence()?.take(10)?.forEach { line ->
@@ -1321,7 +1360,15 @@ class SetupManager(
             extraEnv = mapOf("PROROOT_PROBE_PHASE" to "probe-openclaw-version"),
             wrapInHostShell = false,
             captureViaTempFile = true,
+            runtime = runtime,
         )
+    }
+
+    private fun currentConfiguredRuntime(): ExecutionRuntime {
+        return runCatching {
+            val flow = preferencesManager?.executionRuntime ?: return@runCatching ExecutionRuntime.PROROOT
+            runBlocking { ExecutionRuntime.fromStorageValue(flow.first()) }
+        }.getOrDefault(ExecutionRuntime.PROROOT)
     }
 
 }

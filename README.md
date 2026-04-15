@@ -65,6 +65,12 @@ Artifacts:
 ./gradlew lintDebug
 ```
 
+## 16KB Page-Size Compatibility
+
+Google Play requires 16KB page-size compatibility for Android 15+ targets. `scripts/setup-assets.sh` verifies bundled native binaries before packaging.
+
+- `scripts/setup-assets.sh` checks `app/src/main/jniLibs/arm64-v8a/*.so` LOAD segment alignments.
+
 ## Open-Source Notices
 
 See `THIRD_PARTY_LICENSES.md` for key third-party runtime components and distribution notes.

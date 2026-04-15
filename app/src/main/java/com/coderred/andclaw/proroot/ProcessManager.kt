@@ -514,6 +514,7 @@ class ProcessManager(
             lastMemorySearchProvider = normalizedMemorySearchProvider
             lastMemorySearchApiKey = normalizedMemorySearchApiKey
         }
+        val runtimeSnapshot = prorootManager.selectedRuntime
 
         _gatewayState.value = _gatewayState.value.copy(
             status = GatewayStatus.STARTING,
@@ -608,8 +609,21 @@ class ProcessManager(
                 ensureChannelConfig(channelConfig)
                 ensureStartupAttemptStillValid()
 
-                // proot 명령어 구성
-                val cmd = prorootManager.buildGatewayCommand()
+                if (!prorootManager.isRuntimeAvailable(runtimeSnapshot)) {
+                    clearStartupAttempt()
+                    _gatewayState.value = _gatewayState.value.copy(
+                        status = GatewayStatus.ERROR,
+                        errorMessage = "Selected runtime (${runtimeSnapshot.storageValue}) is not available.",
+                        pid = null,
+                    )
+                    addLog("[andClaw] Selected runtime (${runtimeSnapshot.storageValue}) is not available")
+                    return@launch
+                }
+                prorootManager.prepareRuntime(runtimeSnapshot)
+                ensureStartupAttemptStillValid()
+
+                // proot/proroot 명령어 구성
+                val cmd = prorootManager.buildGatewayCommand(runtimeSnapshot)
 
                 // 환경변수 구성 (API 키 포함)
                 val extraEnv = buildMap {
@@ -683,7 +697,7 @@ class ProcessManager(
                         put("DISCORD_BOT_TOKEN", channelConfig.discordBotToken)
                     }
                 }
-                val env = prorootManager.buildEnvironment(extraEnv)
+                val env = prorootManager.buildEnvironment(extraEnv, runtimeSnapshot)
 
                 // 프로세스 시작
                 val pb = ProcessBuilder(cmd).redirectErrorStream(true)

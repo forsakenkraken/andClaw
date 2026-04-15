@@ -136,6 +136,40 @@ Anahtarınız sunucularımıza gönderilmez.</string>
 
     <!-- Tools -->
     <string name="settings_section_tools">Araçlar</string>
+    <string name="settings_section_advanced_users">İleri düzey kullanıcılar</string>
+    <string name="settings_execution_runtime_title">Çalıştırma ortamı</string>
+    <string name="settings_execution_runtime_desc">Bunu yalnızca varsayılan çalışma ortamında uyumluluk sorunu varsa değiştirin.</string>
+    <string name="settings_execution_runtime_dialog_title">Çalıştırma ortamı</string>
+    <string name="settings_execution_runtime_proroot">proroot (hızlı başlangıç)</string>
+    <string name="settings_execution_runtime_proot">proot (kararlılık)</string>
+    <string name="settings_openclaw_config_editor_entry">OpenClaw yapılandırma düzenleyicisi</string>
+    <string name="settings_openclaw_config_editor_entry_desc">openclaw.json yedeklerini incele, düzenle ve geri yükle.</string>
+    <string name="settings_openclaw_config_editor_title">OpenClaw yapılandırma düzenleyicisi</string>
+    <string name="settings_openclaw_config_editor_save">Kaydet</string>
+    <string name="settings_openclaw_config_editor_current_source">Geçerli kaynak</string>
+    <string name="settings_openclaw_config_editor_backups">Yedekler</string>
+    <string name="settings_openclaw_config_editor_no_backups">Kullanılabilir yedek yok</string>
+    <string name="settings_openclaw_config_editor_missing">openclaw.json bulunamadı. Yeni bir dosya oluşturabilirsiniz.</string>
+    <string name="settings_openclaw_config_editor_save_failed">OpenClaw yapılandırma düzenleyicisi hatası</string>
+    <string name="settings_openclaw_extension_prune">Kullanılmayan OpenClaw uzantılarını sil</string>
+    <string name="settings_openclaw_extension_prune_desc">Bunu yalnızca proot (kararlılık) seçiliyse ve gateway başlatılırken takılı kalıyorsa ya da OpenClaw belirgin şekilde yavaş yanıt veriyorsa kullanın.</string>
+    <string name="settings_openclaw_extension_prune_running">Kullanılmayan OpenClaw uzantıları siliniyor…</string>
+    <string name="settings_openclaw_extension_prune_confirm_title">Kullanılmayan OpenClaw uzantıları silinsin mi?</string>
+    <string name="settings_openclaw_extension_prune_confirm_message">Bunu yalnızca proot (kararlılık) seçiliyse ve gateway başlatılırken takılı kalıyorsa ya da OpenClaw belirgin şekilde yavaş yanıt veriyorsa kullanın. Zaten eksik olan öğeler otomatik olarak atlanır.</string>
+    <string name="settings_openclaw_extension_prune_done">Kullanılmayan OpenClaw uzantıları silindi</string>
+    <string name="settings_openclaw_extension_prune_failed">Kullanılmayan OpenClaw uzantıları silinemedi</string>
+    <string name="settings_openclaw_extension_prune_failed_message">Önceden seçilmiş OpenClaw uzantıları silinemedi.</string>
+    <string name="settings_openclaw_extension_prune_result_partial">Silindi: %1$d
+Zaten yok: %2$d
+Başarısız: %3$d
+Bazı öğeler kaldırılamadı.</string>
+    <string name="settings_openclaw_extension_prune_result_summary">Silindi: %1$d
+Zaten yok: %2$d
+Başarısız: %3$d</string>
+    <string name="settings_openclaw_extension_prune_action">Sil</string>
+    <string name="settings_openclaw_extension_prune_requires_proot">Yalnızca proot (kararlılık) seçildiğinde kullanılabilir.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_message">Bu yedeği yüklemek editördeki mevcut JSON içeriğini değiştirecek. Kaydetmeden önce yedek gerçekten uygulanmaz.</string>
+    <string name="settings_openclaw_config_editor_replace_confirm_title">Mevcut taslak değiştirilsin mi?</string>
     <string name="settings_brave_search_key">Brave Search API Anahtarı</string>
     <string name="settings_brave_search_desc">AI ajanı için web aramasını etkinleştirir. İsteğe bağlı — devre dışı bırakmak için boş bırakın.</string>
     <string name="settings_brave_search_optional">Yapılandırılmadı (isteğe bağlı)</string>
@@ -310,7 +344,6 @@ Kurtarma sürerken uygulamayı kapatmayın veya zorla durdurmayın.</string>
     <string name="settings_transfer_export_success">Aktarım dışa aktarma tamamlandı.</string>
     <string name="settings_transfer_share_failed">Aktarım dosyası paylaşılamadı.</string>
 </resources>
-
 
 
 
