@@ -80,6 +80,9 @@
     <string name="dashboard_apikey_required_message">ゲートウェイを開始するには、設定でAPIキーを入力してください。</string>
     <string name="dashboard_apikey_go_settings">設定へ移動</string>
     <string name="dashboard_apikey_dismiss">後で</string>
+    <string name="dashboard_runtime_change_required_title">実行ランタイムの変更が必要です</string>
+    <string name="dashboard_runtime_change_required_message">現在の実行ランタイムでは OpenClaw を起動できない場合があります。設定 &gt; ツールで実行ランタイムを proot（安定性）に変更し、その後でもう一度 gateway を開始してください。ランタイムを変更した後、ツールから bug report ZIP を送ってください。アプリ改善に大きく役立ちます。</string>
+    <string name="dashboard_runtime_change_required_action">ツールへ移動</string>
     <string name="dashboard_btn_stop">停止</string>
     <string name="dashboard_btn_restart">再起動</string>
     <string name="dashboard_channels_value">%1$d</string>

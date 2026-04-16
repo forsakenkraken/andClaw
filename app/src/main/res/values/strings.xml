@@ -107,6 +107,9 @@ Do not close or force-stop the app while recovery is in progress.</string>
     <string name="dashboard_apikey_required_message">Please set up your API key in Settings before starting the gateway.</string>
     <string name="dashboard_apikey_go_settings">Go to Settings</string>
     <string name="dashboard_apikey_dismiss">Later</string>
+    <string name="dashboard_runtime_change_required_title">Execution runtime change required</string>
+    <string name="dashboard_runtime_change_required_message">The current execution runtime may fail to run OpenClaw. In Settings &gt; Tools, change the execution runtime to proot (stability), then start the gateway again. After changing the runtime, please send a bug report ZIP from Tools. It helps improve the app.</string>
+    <string name="dashboard_runtime_change_required_action">Go to Tools</string>
     <string name="dashboard_btn_stop">Stop</string>
     <string name="dashboard_btn_restart">Restart</string>
     <string name="dashboard_channels_value">%1$d</string>

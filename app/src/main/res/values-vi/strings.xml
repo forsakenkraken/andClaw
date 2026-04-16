@@ -79,6 +79,9 @@ Khóa này không được gửi đến máy chủ của chúng tôi.</string>
     <string name="dashboard_apikey_required_message">Vui lòng thiết lập khóa API của bạn trong Cài đặt trước khi bắt đầu cổng.</string>
     <string name="dashboard_apikey_go_settings">Đi đến Cài đặt</string>
     <string name="dashboard_apikey_dismiss">Sau</string>
+    <string name="dashboard_runtime_change_required_title">Cần thay đổi runtime thực thi</string>
+    <string name="dashboard_runtime_change_required_message">Runtime thực thi hiện tại có thể không chạy được OpenClaw. Trong Cài đặt &gt; Công cụ, hãy đổi runtime thực thi sang proot (ổn định), rồi khởi động lại gateway. Sau khi đổi runtime, vui lòng gửi bug report ZIP từ Công cụ. Điều này giúp cải thiện ứng dụng rất nhiều.</string>
+    <string name="dashboard_runtime_change_required_action">Đi đến Công cụ</string>
     <string name="dashboard_btn_stop">Dừng</string>
     <string name="dashboard_btn_restart">Khởi động lại</string>
     <string name="dashboard_channels_value">%1$d</string>

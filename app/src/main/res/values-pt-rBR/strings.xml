@@ -79,6 +79,9 @@ Ela não é enviada para nossos servidores.</string>
     <string name="dashboard_apikey_required_message">Configure sua chave de API em Configurações antes de iniciar o gateway.</string>
     <string name="dashboard_apikey_go_settings">Ir para Configurações</string>
     <string name="dashboard_apikey_dismiss">Depois</string>
+    <string name="dashboard_runtime_change_required_title">É necessário alterar o runtime de execução</string>
+    <string name="dashboard_runtime_change_required_message">O runtime de execução atual pode falhar ao iniciar o OpenClaw. Em Configurações &gt; Ferramentas, altere o runtime de execução para proot (estabilidade) e depois inicie o gateway novamente. Após mudar o runtime, envie um ZIP de relatório de bug em Ferramentas. Isso ajuda muito a melhorar o app.</string>
+    <string name="dashboard_runtime_change_required_action">Ir para Ferramentas</string>
     <string name="dashboard_btn_stop">Parar</string>
     <string name="dashboard_btn_restart">Reiniciar</string>
     <string name="dashboard_channels_value">%1$d</string>

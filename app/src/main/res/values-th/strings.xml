@@ -79,6 +79,9 @@
     <string name="dashboard_apikey_required_message">โปรดตั้งค่า API key ของคุณในการตั้งค่าก่อนเริ่ม gateway</string>
     <string name="dashboard_apikey_go_settings">ไปที่การตั้งค่า</string>
     <string name="dashboard_apikey_dismiss">ทีหลัง</string>
+    <string name="dashboard_runtime_change_required_title">จำเป็นต้องเปลี่ยนรันไทม์การทำงาน</string>
+    <string name="dashboard_runtime_change_required_message">รันไทม์การทำงานปัจจุบันอาจไม่สามารถเรียกใช้ OpenClaw ได้ ใน การตั้งค่า &gt; เครื่องมือ ให้เปลี่ยนรันไทม์การทำงานเป็น proot (เสถียรภาพ) แล้วเริ่ม gateway ใหม่อีกครั้ง หลังจากเปลี่ยนรันไทม์แล้ว โปรดส่ง bug report ZIP จากเครื่องมือ สิ่งนี้ช่วยปรับปรุงแอปได้มาก</string>
+    <string name="dashboard_runtime_change_required_action">ไปที่เครื่องมือ</string>
     <string name="dashboard_btn_stop">หยุด</string>
     <string name="dashboard_btn_restart">เริ่มใหม่</string>
     <string name="dashboard_channels_value">%1$d</string>

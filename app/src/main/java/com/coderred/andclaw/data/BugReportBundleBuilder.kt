@@ -37,12 +37,22 @@ data class BugReportSessionErrorEntry(
 
 object BugReportBundleBuilder {
     fun sanitizeGatewayLogLines(gatewayLogLines: List<String>): List<String> {
-        return gatewayLogLines
+        val sanitizedLines = gatewayLogLines
             .asSequence()
             .map { it.sanitizeGatewayLogLine() }
             .filter { it.isNotBlank() }
-            .take(MAX_GATEWAY_LOG_LINES)
             .toList()
+
+        val cappedLines = sanitizedLines.take(MAX_GATEWAY_LOG_LINES)
+        val preservedProrootLines = sanitizedLines
+            .drop(MAX_GATEWAY_LOG_LINES)
+            .filter { it.contains(PROROOT_PRESERVE_KEYWORD, ignoreCase = true) }
+
+        return if (preservedProrootLines.isEmpty()) {
+            cappedLines
+        } else {
+            cappedLines + preservedProrootLines
+        }
     }
 
     fun build(
@@ -126,6 +136,7 @@ private fun String.sanitizeGatewayLogLine(): String {
 
 private const val MAX_GATEWAY_LOG_LINES = 400
 private const val MAX_GATEWAY_LOG_LINE_LENGTH = 500
+private const val PROROOT_PRESERVE_KEYWORD = "proroot"
 private const val SECRET_KEY_PATTERN =
     "TELEGRAM_BOT_TOKEN|DISCORD_BOT_TOKEN|OPENROUTER_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|GOOGLE_API_KEY|GEMINI_API_KEY|COPILOT_GITHUB_TOKEN|GH_TOKEN|GITHUB_TOKEN|ZAI_API_KEY|Z_AI_API_KEY|KIMI_API_KEY|KIMICODE_API_KEY|MINIMAX_API_KEY|BRAVE_API_KEY|BRAVE_SEARCH_API_KEY|API_KEY|API-KEY|AUTHORIZATION|PASSWORD|SECRET|TOKEN|ACCESS_TOKEN|REFRESH_TOKEN|ID_TOKEN|X_API_KEY|X-API-KEY"
 private val JSON_SECRET_REGEX = Regex(

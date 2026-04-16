@@ -79,6 +79,9 @@
     <string name="dashboard_apikey_required_message">Пожалуйста, настройте ваш API ключ в Настройках перед запуском шлюза.</string>
     <string name="dashboard_apikey_go_settings">Перейти в Настройки</string>
     <string name="dashboard_apikey_dismiss">Позже</string>
+    <string name="dashboard_runtime_change_required_title">Нужно изменить среду выполнения</string>
+    <string name="dashboard_runtime_change_required_message">Текущая среда выполнения может не запустить OpenClaw. В Настройки &gt; Инструменты измените среду выполнения на proot (стабильность), а затем снова запустите gateway. После изменения отправьте ZIP bug report из Инструментов. Это очень помогает улучшать приложение.</string>
+    <string name="dashboard_runtime_change_required_action">Перейти к инструментам</string>
     <string name="dashboard_btn_stop">Остановить</string>
     <string name="dashboard_btn_restart">Перезагрузить</string>
     <string name="dashboard_channels_value">%1$d</string>

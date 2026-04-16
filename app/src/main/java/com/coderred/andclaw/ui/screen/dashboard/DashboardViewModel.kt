@@ -116,6 +116,11 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     private val _bundleActionType = MutableStateFlow<BundleActionType?>(null)
     val bundleActionType: StateFlow<BundleActionType?> = _bundleActionType.asStateFlow()
 
+    private val _runtimeChangeGuidanceDialog = MutableStateFlow<RuntimeChangeGuidanceDialogState?>(null)
+    val runtimeChangeGuidanceDialog: StateFlow<RuntimeChangeGuidanceDialogState?> =
+        _runtimeChangeGuidanceDialog.asStateFlow()
+    private var lastShownRuntimeChangeGuidanceError: String? = null
+
     private val _availableModels = MutableStateFlow<List<OpenRouterModel>>(emptyList())
     val availableModels: StateFlow<List<OpenRouterModel>> = _availableModels.asStateFlow()
 
@@ -170,6 +175,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun startGateway() {
+        resetRuntimeChangeGuidance()
         GatewayService.start(getApplication(), source = "dashboard:manual_start")
     }
 
@@ -191,6 +197,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun restartGateway() {
+        resetRuntimeChangeGuidance()
         GatewayService.restart(
             getApplication(),
             userInitiated = true,
@@ -747,6 +754,24 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             previous = _bundleUpdateFailure.value,
             current = runtimeFailure,
         )
+        val guidance = shouldShowRuntimeChangeGuidanceDialog(
+            failure = _bundleUpdateFailure.value,
+            lastShownError = lastShownRuntimeChangeGuidanceError,
+            currentVisibleError = _runtimeChangeGuidanceDialog.value?.errorSignature,
+        )
+        if (guidance != null) {
+            _runtimeChangeGuidanceDialog.value = guidance
+            lastShownRuntimeChangeGuidanceError = guidance.errorSignature
+        }
+    }
+
+    fun consumeRuntimeChangeGuidanceDialog() {
+        _runtimeChangeGuidanceDialog.value = null
+    }
+
+    private fun resetRuntimeChangeGuidance() {
+        lastShownRuntimeChangeGuidanceError = null
+        _runtimeChangeGuidanceDialog.value = null
     }
 }
 
@@ -786,6 +811,21 @@ data class DashboardGatewayUiState(
     val errorMessage: String? = null,
     val dashboardReady: Boolean = false,
 )
+
+data class RuntimeChangeGuidanceDialogState(
+    val errorSignature: String,
+)
+
+internal fun shouldShowRuntimeChangeGuidanceDialog(
+    failure: BundleUpdateFailureState?,
+    lastShownError: String?,
+    currentVisibleError: String?,
+): RuntimeChangeGuidanceDialogState? {
+    val errorSignature = failure?.lastError?.takeIf { it.isNotBlank() } ?: return null
+    if (failure.lastFailureType != RuntimeRecoverableFailureDetector.FAILURE_TYPE) return null
+    if (errorSignature == lastShownError || errorSignature == currentVisibleError) return null
+    return RuntimeChangeGuidanceDialogState(errorSignature = errorSignature)
+}
 
 internal fun readGatewayAuthTokenFromConfig(configFile: java.io.File): String? {
     return runCatching {

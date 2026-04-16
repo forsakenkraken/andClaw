@@ -105,6 +105,15 @@ import java.util.Locale
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
+internal const val SETTINGS_SECTION_TOOLS = "tools"
+
+internal fun resolveInitialSettingsTabIndex(initialSection: String?): Int {
+    return when (initialSection) {
+        SETTINGS_SECTION_TOOLS -> 3
+        else -> 0
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("FunctionName")
 @Composable
@@ -112,6 +121,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onOpenClawConfigEditor: () -> Unit,
     initialApiProvider: String? = null,
+    initialSection: String? = null,
     openApiKeyDialogOnLaunch: Boolean = false,
     viewModel: SettingsViewModel = viewModel(),
 ) {
@@ -253,7 +263,9 @@ fun SettingsScreen(
     }
     var apiKeyDialogProviderOverride by remember { mutableStateOf<String?>(null) }
     var apiKeyDialogCurrentKeyOverride by remember { mutableStateOf<String?>(null) }
-    var selectedSettingsTabIndex by remember { mutableStateOf(0) }
+    var selectedSettingsTabIndex by remember(initialSection) {
+        mutableStateOf(resolveInitialSettingsTabIndex(initialSection))
+    }
     val isMaintenanceBusy =
         isDoctorFixRunning ||
             isRecoveryInstallRunning ||

@@ -79,6 +79,9 @@ Kunci ini tidak dikirim ke server kami.</string>
     <string name="dashboard_apikey_required_message">Harap atur kunci API Anda di Pengaturan sebelum memulai gateway.</string>
     <string name="dashboard_apikey_go_settings">Buka Pengaturan</string>
     <string name="dashboard_apikey_dismiss">Nanti</string>
+    <string name="dashboard_runtime_change_required_title">Perubahan runtime eksekusi diperlukan</string>
+    <string name="dashboard_runtime_change_required_message">Runtime eksekusi saat ini mungkin gagal menjalankan OpenClaw. Di Pengaturan &gt; Alat, ubah runtime eksekusi ke proot (stabilitas), lalu mulai ulang gateway. Setelah mengubah runtime, kirim ZIP laporan bug dari Alat. Ini sangat membantu untuk meningkatkan aplikasi.</string>
+    <string name="dashboard_runtime_change_required_action">Buka Alat</string>
     <string name="dashboard_btn_stop">Hentikan</string>
     <string name="dashboard_btn_restart">Mulai Ulang</string>
     <string name="dashboard_channels_value">%1$d</string>

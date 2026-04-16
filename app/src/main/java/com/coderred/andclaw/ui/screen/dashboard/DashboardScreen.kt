@@ -101,6 +101,7 @@ import com.coderred.andclaw.data.PairingRequest
 import com.coderred.andclaw.proroot.BundleUpdateFailureState
 import com.coderred.andclaw.ui.component.KeepScreenOnEffect
 import com.coderred.andclaw.ui.component.SessionLogsDialog
+import com.coderred.andclaw.ui.screen.settings.SETTINGS_SECTION_TOOLS
 import com.coderred.andclaw.ui.theme.StatusError
 import com.coderred.andclaw.ui.theme.StatusRunning
 import com.coderred.andclaw.ui.theme.StatusStopped
@@ -112,7 +113,7 @@ import java.util.Locale
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
-    onNavigateToSettings: (String?) -> Unit,
+    onNavigateToSettings: (String?, String?) -> Unit,
     viewModel: DashboardViewModel = viewModel(),
 ) {
     val gatewayUiState by viewModel.gatewayUiState.collectAsState()
@@ -129,6 +130,7 @@ fun DashboardScreen(
     val bundleActionInProgress by viewModel.bundleActionInProgress.collectAsState()
     val bundleActionMessage by viewModel.bundleActionMessage.collectAsState()
     val bundleActionType by viewModel.bundleActionType.collectAsState()
+    val runtimeChangeGuidanceDialog by viewModel.runtimeChangeGuidanceDialog.collectAsState()
     val setupState by viewModel.setupState.collectAsState()
     val context = LocalContext.current
     KeepScreenOnEffect(enabled = bundleActionInProgress)
@@ -195,7 +197,7 @@ fun DashboardScreen(
                     containerColor = Color.Transparent,
                 ),
                 actions = {
-                    IconButton(onClick = { onNavigateToSettings(null) }) {
+                    IconButton(onClick = { onNavigateToSettings(null, null) }) {
                         Icon(
                             Icons.Default.Settings,
                             contentDescription = stringResource(R.string.dashboard_cd_settings),
@@ -321,7 +323,7 @@ fun DashboardScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showApiKeyWarning = false
-                    onNavigateToSettings(apiKeyWarningProvider)
+                    onNavigateToSettings(apiKeyWarningProvider, null)
                     apiKeyWarningProvider = null
                 }) {
                     Text(stringResource(R.string.dashboard_apikey_go_settings))
@@ -333,6 +335,23 @@ fun DashboardScreen(
                     apiKeyWarningProvider = null
                 }) {
                     Text(stringResource(R.string.dashboard_apikey_dismiss))
+                }
+            },
+        )
+    }
+
+    runtimeChangeGuidanceDialog?.let {
+        AlertDialog(
+            onDismissRequest = {},
+            shape = RoundedCornerShape(24.dp),
+            title = { Text(stringResource(R.string.dashboard_runtime_change_required_title)) },
+            text = { Text(stringResource(R.string.dashboard_runtime_change_required_message)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.consumeRuntimeChangeGuidanceDialog()
+                    onNavigateToSettings(null, SETTINGS_SECTION_TOOLS)
+                }) {
+                    Text(stringResource(R.string.dashboard_runtime_change_required_action))
                 }
             },
         )
@@ -1152,5 +1171,4 @@ private fun BundleActionProgressDialog(
         }
     }
 }
-
 

@@ -79,6 +79,9 @@ Anahtarınız sunucularımıza gönderilmez.</string>
     <string name="dashboard_apikey_required_message">Ağ geçidini başlatmadan önce Ayarlar\'da API anahtarınızı ayarlayın.</string>
     <string name="dashboard_apikey_go_settings">Ayarlara Git</string>
     <string name="dashboard_apikey_dismiss">Daha Sonra</string>
+    <string name="dashboard_runtime_change_required_title">Çalıştırma ortamını değiştirmeniz gerekiyor</string>
+    <string name="dashboard_runtime_change_required_message">Mevcut çalıştırma ortamı OpenClaw’u başlatamayabilir. Ayarlar &gt; Araçlar bölümünde çalıştırma ortamını proot (kararlılık) olarak değiştirin ve ardından gateway’i yeniden başlatın. Ortamı değiştirdikten sonra Araçlar’dan bir bug report ZIP gönderin. Bu, uygulamayı geliştirmeye çok yardımcı olur.</string>
+    <string name="dashboard_runtime_change_required_action">Araçlara Git</string>
     <string name="dashboard_btn_stop">Durdur</string>
     <string name="dashboard_btn_restart">Yeniden Başlat</string>
     <string name="dashboard_channels_value">%1$d</string>

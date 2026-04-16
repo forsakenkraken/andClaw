@@ -84,6 +84,9 @@ Er wird nicht an unsere Server gesendet.</string>
     <string name="dashboard_apikey_required_message">Bitte geben Sie in den Einstellungen einen API-Schlüssel ein, bevor Sie das Gateway starten.</string>
     <string name="dashboard_apikey_go_settings">Zu Einstellungen</string>
     <string name="dashboard_apikey_dismiss">Später</string>
+    <string name="dashboard_runtime_change_required_title">Änderung der Laufzeitumgebung erforderlich</string>
+    <string name="dashboard_runtime_change_required_message">Die aktuelle Laufzeitumgebung kann OpenClaw möglicherweise nicht ausführen. Ändere in Einstellungen &gt; Tools die Laufzeitumgebung zu proot (Stabilität) und starte das Gateway dann erneut. Sende nach der Änderung bitte ein Bug-Report-ZIP aus den Tools. Das hilft sehr bei der Verbesserung der App.</string>
+    <string name="dashboard_runtime_change_required_action">Zu den Tools</string>
     <string name="dashboard_btn_stop">Stoppen</string>
     <string name="dashboard_btn_restart">Neustarten</string>
     <string name="dashboard_channels_value">%1$d</string>

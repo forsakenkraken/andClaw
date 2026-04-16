@@ -80,6 +80,9 @@
     <string name="dashboard_apikey_required_message">启动网关前，请先在设置中输入 API 密钥。</string>
     <string name="dashboard_apikey_go_settings">前往设置</string>
     <string name="dashboard_apikey_dismiss">稍后</string>
+    <string name="dashboard_runtime_change_required_title">需要更改执行运行时</string>
+    <string name="dashboard_runtime_change_required_message">当前执行运行时可能无法启动 OpenClaw。请在“设置 &gt; 工具”中将执行运行时改为 proot（稳定性），然后重新启动 gateway。更改运行时后，请在工具中发送 bug report ZIP。这会对改进应用有很大帮助。</string>
+    <string name="dashboard_runtime_change_required_action">前往工具</string>
     <string name="dashboard_btn_stop">停止</string>
     <string name="dashboard_btn_restart">重启</string>
     <string name="dashboard_channels_value">%1$d</string>

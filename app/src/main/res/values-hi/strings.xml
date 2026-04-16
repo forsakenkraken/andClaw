@@ -79,6 +79,9 @@
     <string name="dashboard_apikey_required_message">गेटवे शुरू करने से पहले कृपया सेटिंग्स में अपनी API कुंजी सेट अप करें।</string>
     <string name="dashboard_apikey_go_settings">सेटिंग्स पर जाएं</string>
     <string name="dashboard_apikey_dismiss">बाद में</string>
+    <string name="dashboard_runtime_change_required_title">एक्जीक्यूशन रनटाइम बदलना आवश्यक है</string>
+    <string name="dashboard_runtime_change_required_message">मौजूदा एक्जीक्यूशन रनटाइम OpenClaw चलाने में असफल हो सकता है। सेटिंग्स &gt; टूल्स में जाकर एक्जीक्यूशन रनटाइम को proot (स्थिरता) में बदलें, फिर गेटवे दोबारा शुरू करें। रनटाइम बदलने के बाद टूल्स से bug report ZIP भेजें। इससे ऐप सुधारने में बहुत मदद मिलती है।</string>
+    <string name="dashboard_runtime_change_required_action">टूल्स पर जाएं</string>
     <string name="dashboard_btn_stop">बंद करें</string>
     <string name="dashboard_btn_restart">पुनः शुरू करें</string>
     <string name="dashboard_channels_value">%1$d</string>

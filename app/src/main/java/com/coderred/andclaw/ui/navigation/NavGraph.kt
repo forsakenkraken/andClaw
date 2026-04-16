@@ -84,11 +84,15 @@ fun AndClawNavGraph(
 
         composable(Screen.Dashboard.route) {
             DashboardScreen(
-                onNavigateToSettings = { provider ->
+                onNavigateToSettings = { provider, initialSection ->
                     navController.currentBackStackEntry?.savedStateHandle?.set("settings_api_provider", provider)
                     navController.currentBackStackEntry?.savedStateHandle?.set(
                         "settings_open_api_key_dialog",
                         provider != null,
+                    )
+                    navController.currentBackStackEntry?.savedStateHandle?.set(
+                        "settings_initial_section",
+                        initialSection,
                     )
                     navController.navigate(Screen.Settings.route)
                 }
@@ -98,12 +102,14 @@ fun AndClawNavGraph(
         composable(Screen.Settings.route) {
             val previousSavedStateHandle = navController.previousBackStackEntry?.savedStateHandle
             val initialApiProvider = previousSavedStateHandle?.remove<String>("settings_api_provider")
+            val initialSection = previousSavedStateHandle?.remove<String>("settings_initial_section")
             val openApiKeyDialogOnLaunch =
                 previousSavedStateHandle?.remove<Boolean>("settings_open_api_key_dialog") == true
             SettingsScreen(
                 onBack = { navController.popBackStack() },
                 onOpenClawConfigEditor = { navController.navigate(Screen.OpenClawConfigEditor.route) },
                 initialApiProvider = initialApiProvider,
+                initialSection = initialSection,
                 openApiKeyDialogOnLaunch = openApiKeyDialogOnLaunch,
             )
         }

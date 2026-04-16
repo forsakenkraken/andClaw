@@ -653,18 +653,19 @@ class SetupManager(
                 "OpenClaw executable is not executable after install: ${openClawBin.path}",
             )
         }
-        val validationResult = runOpenClawValidationInCurrentProcess(
-            requirePatchedNodeOptions = false,
-            runtime = runtime,
-        )
-        if (validationResult == null || validationResult.exitCode != 0) {
+        val openClawModuleDir = File(prorootManager.rootfsDir, "usr/local/lib/node_modules/openclaw")
+        if (!openClawModuleDir.isDirectory) {
             throw SetupException(
-                "OpenClaw executable validation failed: ${openClawBin.path}" +
-                    (validationResult?.let { " (exit=${it.exitCode}, output=${it.output.take(200)})" }
-                        ?: " (null result)"),
+                "OpenClaw module directory not found: ${openClawModuleDir.path}",
             )
         }
-        log("   OpenClaw executable verified")
+        val openClawEntrypoint = File(openClawModuleDir, "openclaw.mjs")
+        if (!openClawEntrypoint.isFile) {
+            throw SetupException(
+                "OpenClaw entrypoint not found: ${openClawEntrypoint.path}",
+            )
+        }
+        log("   OpenClaw install layout verified for ${runtime.storageValue}")
     }
 
     // ── Step 7: Playwright Chromium 설치 ──
@@ -1281,11 +1282,11 @@ class SetupManager(
         }
 
         log("   Checking OpenClaw...")
-        val openClawValidationResult = runOpenClawValidationInCurrentProcess(
-            requirePatchedNodeOptions = true,
-            runtime = runtime,
+        val openClawEntrypoint = File(
+            prorootManager.rootfsDir,
+            "usr/local/lib/node_modules/openclaw/openclaw.mjs",
         )
-        if (openClawValidationResult == null || openClawValidationResult.exitCode != 0 || !prorootManager.isOpenClawInstalled) {
+        if (!prorootManager.isOpenClawInstalled || !openClawEntrypoint.isFile) {
             throw SetupException("OpenClaw validation failed")
         }
 
