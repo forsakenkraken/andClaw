@@ -47,9 +47,6 @@ class OpenClawConfigEditorManager(
     private val extensionsDir: File
         get() = File(rootfsDir, OPENCLAW_EXTENSIONS_DIR_PATH)
 
-    private val nodeModulesDir: File
-        get() = File(rootfsDir, OPENCLAW_NODE_MODULES_DIR_PATH)
-
     fun loadCurrentConfig(): String? = configFile.takeIf(File::exists)?.readText()
 
     fun listBackupConfigs(): List<BackupConfigFile> = BACKUP_FILE_NAMES
@@ -98,16 +95,6 @@ class OpenClawConfigEditorManager(
             rootDir = extensionsDir,
             rootRelativePath = OPENCLAW_EXTENSIONS_DIR_PATH,
             targets = BLACKLISTED_EXTENSION_DIRS,
-            removed = removed,
-            missing = missing,
-            failed = failed,
-            counts = counts,
-        )
-
-        pruneTargets(
-            rootDir = nodeModulesDir,
-            rootRelativePath = OPENCLAW_NODE_MODULES_DIR_PATH,
-            targets = BLACKLISTED_NODE_MODULES_DIRS,
             removed = removed,
             missing = missing,
             failed = failed,
@@ -233,7 +220,6 @@ class OpenClawConfigEditorManager(
         private const val OPENCLAW_DIR_PATH = "root/.openclaw"
         private const val CONFIG_FILE_NAME = "openclaw.json"
         private const val OPENCLAW_EXTENSIONS_DIR_PATH = "usr/local/lib/node_modules/openclaw/dist/extensions"
-        private const val OPENCLAW_NODE_MODULES_DIR_PATH = "usr/local/lib/node_modules/openclaw/node_modules"
         private val BACKUP_FILE_NAMES = listOf(
             "openclaw.json.bak",
             "openclaw.json.bak.1",
@@ -251,23 +237,6 @@ class OpenClawConfigEditorManager(
             "webhooks",
             "nostr",
             "qqbot",
-        )
-        // dist BFS 기준 dead island. scope 전체가 unreachable인 것만 scope 단위로 넣고,
-        // 살아있는 subpkg가 하나라도 있는 scope(@aws-sdk/*, @opentelemetry/* 등)는 건드리지 않는다.
-        // @jimp/jimp: baileys가 `import('jimp').catch(...)`로 optional 로드하는데, sharp native가
-        // 우선 사용되므로 실질 dead.
-        val BLACKLISTED_NODE_MODULES_DIRS = listOf(
-            "@azure",
-            "@d-fischer",
-            "@grpc",
-            "@jimp",
-            "@line",
-            "@microsoft",
-            "@twurple",
-            "@typespec",
-            "ircv3",
-            "jimp",
-            "zca-js",
         )
     }
 }

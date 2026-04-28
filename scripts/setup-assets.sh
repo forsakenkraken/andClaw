@@ -415,7 +415,10 @@ else
 
         echo '--- Installing OpenClaw ---'
         # 일부 환경에서 node-gyp가 python 경로를 자동 감지하지 못해 명시적으로 지정한다.
-        PYTHON=/usr/bin/python3 npm_config_python=/usr/bin/python3 npm install -g $OPENCLAW_INSTALL_SPEC 2>&1
+        OPENCLAW_EAGER_BUNDLED_PLUGIN_DEPS=1 \
+          PYTHON=/usr/bin/python3 \
+          npm_config_python=/usr/bin/python3 \
+          npm install -g $OPENCLAW_INSTALL_SPEC 2>&1
 
         echo '--- Verifying node:sqlite + FTS5 + sqlite-vec ---'
         cat > /tmp/verify-node-sqlite.cjs <<'NODE'
@@ -446,9 +449,7 @@ NODE
             fi
         done
 
-        # WhatsApp extension: baileys/jimp은 OpenClaw 빌드 시 dist JS에 이미 인라인됨
-        # node_modules 설치 불필요 — 호스트 pruning에서 잔여 파일 정리
-        echo '--- WhatsApp extension dependencies: skipped (inlined in dist) ---'
+        echo '--- Bundled plugin runtime dependencies: installed during asset build ---'
 
         # Windows docker cp에서 symlink 생성 권한 오류를 피하기 위해 .bin 심링크 제거
         find /usr/local/lib/node_modules/openclaw/node_modules -path '*/.bin/*' -type l -delete || true

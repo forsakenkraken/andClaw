@@ -293,7 +293,7 @@ class ProcessManager(
         private const val TAG = "ProcessManager"
         private const val GATEWAY_PORT = 18789
         private const val DEFAULT_MEMORY_SEARCH_PROVIDER = "auto"
-        private const val OPENCLAW_PATCH_VERSION = "openclaw-patch-v5-dns-no-fallback"
+        private const val OPENCLAW_PATCH_VERSION = "openclaw-patch-v6-skip-pricing-fetch"
         private val REMOTE_MEMORY_SEARCH_PROVIDERS = setOf("auto", "openai", "gemini", "voyage", "mistral")
 
         private fun normalizeMemorySearchProvider(raw: String): String {
@@ -1306,30 +1306,7 @@ class ProcessManager(
             val targetModels = normalizedSelectedEntries
                 .map { toProviderScopedModel(it.id) }
                 .distinct()
-            fun modelPrefixesForProvider(provider: String): Set<String> = when (provider) {
-                "openrouter" -> setOf("openrouter/", "nvidia/")
-                "anthropic" -> setOf("anthropic/")
-                "openai" -> setOf("openai/")
-                "openai-codex" -> setOf("openai-codex/")
-                "github-copilot" -> setOf("github-copilot/")
-                "zai" -> setOf("zai/")
-                "kimi-coding" -> setOf("kimi-coding/")
-                "minimax" -> setOf("minimax/")
-                "openai-compatible" -> setOf("openai-compatible/")
-                "ollama" -> setOf("ollama/")
-                "ollama-cloud" -> setOf("ollama/")
-                "google" -> setOf("google/")
-                else -> setOf("${provider.trim().lowercase()}/")
-            }
-            val providerModelPrefixes = modelPrefixesForProvider(apiProvider)
-            val mergedModelKeys = buildList {
-                addAll(
-                    currentModelKeys.filterNot { existingModelId ->
-                        providerModelPrefixes.any { prefix -> existingModelId.startsWith(prefix) }
-                    },
-                )
-                addAll(targetModels)
-            }.distinct()
+            val mergedModelKeys = targetModels
             val registeredCustomModelIds = readRegisteredCustomModelIdsByProvider()
             val builtInOpenRouterModelIds = getBuiltInOpenRouterModelIds()
             fun isResolvableModelKey(modelKey: String): Boolean {
@@ -1588,6 +1565,16 @@ class ProcessManager(
                 )
                 changed = true
             }
+
+            if (pruneUnselectedOpenClawJsonModelProviders(json, apiProvider)) {
+                changed = true
+            }
+
+            sanitizeAgentModelState(
+                apiProvider = apiProvider,
+                selectedEntries = normalizedSelectedEntries,
+                providerScopedModels = targetModels.toSet(),
+            )
 
                 // gateway 설정 (mode 및 controlUi.allowedOrigins)
                 val gateway = json.optJSONObject("gateway") ?: JSONObject().also { json.put("gateway", it) }
@@ -2105,6 +2092,26 @@ class ProcessManager(
         }
     }
 
+    private fun pruneUnselectedOpenClawJsonModelProviders(
+        config: JSONObject,
+        apiProvider: String,
+    ): Boolean {
+        val providers = config.optJSONObject("models")?.optJSONObject("providers") ?: return false
+        val keepProvider = when (apiProvider) {
+            "ollama", "ollama-cloud" -> "ollama"
+            else -> null
+        }
+        val keys = providers.keys().asSequence().toList()
+        var changed = false
+        keys.forEach { provider ->
+            if (provider != keepProvider) {
+                providers.remove(provider)
+                changed = true
+            }
+        }
+        return changed
+    }
+
     private fun modelsJsonFile(): File =
         File(prorootManager.rootfsDir, "root/.openclaw/agents/main/agent/models.json")
 
@@ -2165,6 +2172,183 @@ class ProcessManager(
             file.writeText(root.toString(2))
         }.onFailure { throwable ->
             addLog("[andClaw] Failed to remove $provider from models.json: ${throwable.message}")
+        }
+    }
+
+    private fun sanitizeAgentModelState(
+        apiProvider: String,
+        selectedEntries: List<ModelSelectionEntry>,
+        providerScopedModels: Set<String>,
+    ) {
+        val selectedModelIds = selectedEntries
+            .map { it.id.trim() }
+            .filter { it.isNotBlank() }
+            .toSet()
+        if (selectedModelIds.isEmpty() || providerScopedModels.isEmpty()) return
+
+        sanitizeAgentModelsJson(apiProvider, selectedModelIds)
+        sanitizeAgentSessionsJson(selectedModelIds, providerScopedModels)
+    }
+
+    private fun sanitizeAgentModelsJson(
+        apiProvider: String,
+        selectedModelIds: Set<String>,
+    ) {
+        val file = modelsJsonFile()
+        if (!file.exists()) return
+
+        runCatching {
+            val root = JSONObject(file.readText())
+            val providers = root.optJSONObject("providers") ?: return
+            val allowedProviders = modelsJsonProviderNamesFor(apiProvider)
+            val providerKeys = providers.keys().asSequence().toList()
+            var changed = false
+
+            providerKeys.forEach { provider ->
+                val providerObject = providers.optJSONObject(provider)
+                if (provider !in allowedProviders || providerObject == null) {
+                    providers.remove(provider)
+                    changed = true
+                    return@forEach
+                }
+
+                val models = providerObject.optJSONArray("models")
+                if (models == null) {
+                    providers.remove(provider)
+                    changed = true
+                    return@forEach
+                }
+
+                val allowedIds = selectedModelIdsForModelsJsonProvider(apiProvider, selectedModelIds)
+                val filteredModels = JSONArray()
+                for (index in 0 until models.length()) {
+                    val modelObject = models.optJSONObject(index) ?: continue
+                    val modelId = modelObject.optString("id").trim()
+                    if (modelId in allowedIds) {
+                        filteredModels.put(modelObject)
+                    }
+                }
+
+                if (filteredModels.length() == 0) {
+                    providers.remove(provider)
+                    changed = true
+                } else if (filteredModels.length() != models.length()) {
+                    providerObject.put("models", filteredModels)
+                    changed = true
+                }
+            }
+
+            if (!changed) return
+            if (providers.length() == 0) {
+                file.delete()
+            } else {
+                file.writeText(root.toString(2))
+            }
+            addLog("[andClaw] Pruned agent models.json to selected model(s)")
+        }.onFailure { throwable ->
+            addLog("[andClaw] Failed to prune agent models.json: ${throwable.message}")
+        }
+    }
+
+    private fun sanitizeAgentSessionsJson(
+        selectedModelIds: Set<String>,
+        providerScopedModels: Set<String>,
+    ) {
+        val file = File(prorootManager.rootfsDir, "root/.openclaw/agents/main/sessions/sessions.json")
+        if (!file.exists()) return
+
+        runCatching {
+            val root = JSONObject(file.readText())
+            val keys = root.keys().asSequence().toList()
+            var changed = false
+
+            keys.forEach { key ->
+                val entry = root.optJSONObject(key) ?: return@forEach
+                val overrideModel = entry.optString("modelOverride").trim()
+                if (overrideModel.isNotBlank() && !isSelectedAgentModelReference(
+                        provider = entry.optString("providerOverride").trim(),
+                        model = overrideModel,
+                        selectedModelIds = selectedModelIds,
+                        providerScopedModels = providerScopedModels,
+                    )
+                ) {
+                    entry.remove("providerOverride")
+                    entry.remove("modelOverride")
+                    entry.remove("modelOverrideSource")
+                    entry.remove("modelOverrideCompactionCount")
+                    changed = true
+                }
+
+                val model = entry.optString("model").trim()
+                if (model.isNotBlank() && !isSelectedAgentModelReference(
+                        provider = entry.optString("modelProvider").trim(),
+                        model = model,
+                        selectedModelIds = selectedModelIds,
+                        providerScopedModels = providerScopedModels,
+                    )
+                ) {
+                    entry.remove("modelProvider")
+                    entry.remove("model")
+                    changed = true
+                }
+            }
+
+            if (changed) {
+                file.writeText(root.toString(2))
+                addLog("[andClaw] Pruned stale agent session model state")
+            }
+        }.onFailure { throwable ->
+            addLog("[andClaw] Failed to prune agent sessions.json: ${throwable.message}")
+        }
+    }
+
+    private fun isSelectedAgentModelReference(
+        provider: String,
+        model: String,
+        selectedModelIds: Set<String>,
+        providerScopedModels: Set<String>,
+    ): Boolean {
+        val normalizedModel = model.trim()
+        if (normalizedModel.isBlank()) return false
+        if (normalizedModel in selectedModelIds) return true
+        if (normalizedModel in providerScopedModels) return true
+
+        val providerAliases = providerAliasesForAgentModel(provider)
+        return providerAliases.any { alias -> "$alias/$normalizedModel" in providerScopedModels }
+    }
+
+    private fun providerAliasesForAgentModel(provider: String): Set<String> {
+        val normalized = provider.trim().lowercase()
+        return when (normalized) {
+            "" -> emptySet()
+            "codex" -> setOf("codex", "openai-codex")
+            "ollama-cloud" -> setOf("ollama-cloud", "ollama")
+            else -> setOf(normalized)
+        }
+    }
+
+    private fun modelsJsonProviderNamesFor(apiProvider: String): Set<String> {
+        return when (apiProvider.trim().lowercase()) {
+            "openai-codex" -> setOf("openai-codex", "codex")
+            "ollama", "ollama-cloud" -> setOf("ollama")
+            else -> setOf(apiProvider.trim().lowercase())
+        }
+    }
+
+    private fun selectedModelIdsForModelsJsonProvider(
+        apiProvider: String,
+        selectedModelIds: Set<String>,
+    ): Set<String> {
+        return when (apiProvider.trim().lowercase()) {
+            "openai-compatible" -> selectedModelIds
+                .map { it.removePrefix("openai-compatible/") }
+                .filter { it.isNotBlank() }
+                .toSet()
+            "ollama", "ollama-cloud" -> selectedModelIds
+                .map { it.removePrefix("ollama-cloud/").removePrefix("ollama/").removeSuffix(":latest") }
+                .filter { it.isNotBlank() }
+                .toSet()
+            else -> selectedModelIds
         }
     }
 
@@ -2258,6 +2442,7 @@ class ProcessManager(
             !patchFile.readText().contains("uncaughtException") ||
             !patchFile.readText().contains("EAFNOSUPPORT") ||
             !patchFile.readText().contains("openrouter.ai/api/v1/models") ||
+            !patchFile.readText().contains("raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json") ||
             !patchFile.readText().contains("Module._resolveFilename") ||
             !patchFile.readText().contains("realpathSync.native") ||
             !patchFile.readText().contains("dns.setServers") ||
@@ -2292,12 +2477,17 @@ class ProcessManager(
                 appendLine("  return _netListen.apply(this, arguments);")
                 appendLine("};")
                 appendLine()
-                // Skip OpenRouter pricing fetch at startup — blocks event loop
-                // for 15s on proot due to network latency + ptrace overhead.
+                // Skip startup pricing fetches — they are optional metadata and can
+                // block gateway startup for the full 60s fetch timeout on mobile networks.
                 appendLine("var _origFetch = globalThis.fetch;")
                 appendLine("globalThis.fetch = function(url, opts) {")
-                appendLine("  if (typeof url === 'string' && url.includes('openrouter.ai/api/v1/models')) {")
+                appendLine("  var fetchUrl = typeof url === 'string' ? url : (url && url.url ? String(url.url) : '');")
+                appendLine("  if (fetchUrl.includes('openrouter.ai/api/v1/models')) {")
                 appendLine("    return Promise.resolve(new Response(JSON.stringify({data:[]}),")
+                appendLine("      {status:200,headers:{'Content-Type':'application/json'}}));")
+                appendLine("  }")
+                appendLine("  if (fetchUrl.includes('raw.githubusercontent.com/BerriAI/litellm/main/model_prices_and_context_window.json')) {")
+                appendLine("    return Promise.resolve(new Response(JSON.stringify({}),")
                 appendLine("      {status:200,headers:{'Content-Type':'application/json'}}));")
                 appendLine("  }")
                 appendLine("  return _origFetch.apply(this, arguments);")
