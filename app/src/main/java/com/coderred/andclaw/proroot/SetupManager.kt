@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.File
@@ -450,6 +451,8 @@ class SetupManager(
             log("   Removing previous OpenClaw installation...")
             openclawDir.deleteRecursively()
         }
+        clearOpenClawRuntimeDepsCache()
+        clearBundledOpenClawPluginArtifacts()
 
         updateStep(SetupStep.INSTALLING_OPENCLAW, 0.60f)
         log("   Extracting bundle...")
@@ -481,6 +484,7 @@ class SetupManager(
             },
         )
 
+        mergeBundledOpenClawPluginInstallRecords()
         ensureOpenClawExecutable(runtime)
 
         log("   OpenClaw installation complete")
@@ -530,6 +534,8 @@ class SetupManager(
                 log("   Removing previous OpenClaw installation...")
                 openclawDir.deleteRecursively()
             }
+            clearOpenClawRuntimeDepsCache()
+            clearBundledOpenClawPluginArtifacts()
 
             tarInstaller.install(
                 spec = TarInstallSpec(
@@ -552,6 +558,7 @@ class SetupManager(
 
             updateStep(SetupStep.VERIFYING, 0.95f)
             log("   Runtime prepared before OpenClaw verification")
+            mergeBundledOpenClawPluginInstallRecords()
             ensureOpenClawExecutable(runtimeSnapshot)
             saveVersion(openclawVersionFile)
             saveFingerprint(openclawFingerprintFile, ProrootManager.OPENCLAW_ASSET)
@@ -578,6 +585,100 @@ class SetupManager(
         } else {
             log("   WARNING: Failed to clear Node.js compile cache")
         }
+    }
+
+    internal fun clearOpenClawRuntimeDepsCache() {
+        val runtimeDepsDir = File(prorootManager.rootfsDir, "root/.openclaw/plugin-runtime-deps")
+        if (!runtimeDepsDir.exists()) return
+
+        val cleared = runCatching { runtimeDepsDir.deleteRecursively() && !runtimeDepsDir.exists() }
+            .getOrDefault(false)
+        if (cleared) {
+            log("   OpenClaw plugin runtime deps cache cleared")
+        } else {
+            log("   WARNING: Failed to clear OpenClaw plugin runtime deps cache")
+        }
+    }
+
+    internal fun clearBundledOpenClawPluginArtifacts() {
+        val bundledPluginsDir = File(prorootManager.rootfsDir, "root/.openclaw/andclaw-bundled-plugins")
+        if (!bundledPluginsDir.exists()) return
+
+        val cleared = runCatching { bundledPluginsDir.deleteRecursively() && !bundledPluginsDir.exists() }
+            .getOrDefault(false)
+        if (cleared) {
+            log("   andClaw-managed OpenClaw plugin artifacts cleared")
+        } else {
+            log("   WARNING: Failed to clear andClaw-managed OpenClaw plugin artifacts")
+        }
+    }
+
+    internal fun mergeBundledOpenClawPluginInstallRecords() {
+        val templateFile = File(
+            prorootManager.rootfsDir,
+            "root/.openclaw/andclaw-bundled-plugins/install-records.json",
+        )
+        if (!templateFile.exists()) return
+
+        val templateRecords = JSONObject(templateFile.readText()).optJSONObject("installRecords")
+            ?: throw SetupException("Bundled OpenClaw plugin install records are missing installRecords")
+        if (templateRecords.length() == 0) return
+
+        val registryFile = File(prorootManager.rootfsDir, "root/.openclaw/plugins/installs.json")
+        registryFile.parentFile?.mkdirs()
+        val template = JSONObject(templateFile.readText())
+        if (!registryFile.exists()) {
+            registryFile.writeText(template.toString(2))
+            log("   OpenClaw external channel plugin registry installed")
+            return
+        }
+        val registry = JSONObject(registryFile.readText())
+        val installRecords = registry.optJSONObject("installRecords") ?: JSONObject().also {
+            registry.put("installRecords", it)
+        }
+
+        var merged = 0
+        listOf("whatsapp", "discord").forEach { pluginId ->
+            val record = templateRecords.optJSONObject(pluginId) ?: return@forEach
+            installRecords.put(pluginId, JSONObject(record.toString()))
+            merged += 1
+        }
+
+        listOf(
+            "version",
+            "hostContractVersion",
+            "compatRegistryVersion",
+            "migrationVersion",
+        ).forEach { key ->
+            if (!registry.has(key) && template.has(key)) {
+                registry.put(key, template.get(key))
+            }
+        }
+
+        val templatePluginsById = mutableMapOf<String, JSONObject>()
+        val templatePlugins = template.optJSONArray("plugins") ?: JSONArray()
+        for (index in 0 until templatePlugins.length()) {
+            val plugin = templatePlugins.optJSONObject(index) ?: continue
+            val pluginId = plugin.optString("pluginId").trim()
+            if (pluginId == "whatsapp" || pluginId == "discord") {
+                templatePluginsById[pluginId] = plugin
+            }
+        }
+        val existingPlugins = registry.optJSONArray("plugins") ?: JSONArray()
+        val mergedPlugins = JSONArray()
+        for (index in 0 until existingPlugins.length()) {
+            val plugin = existingPlugins.optJSONObject(index) ?: continue
+            val pluginId = plugin.optString("pluginId").trim()
+            if (pluginId != "whatsapp" && pluginId != "discord") {
+                mergedPlugins.put(plugin)
+            }
+        }
+        listOf("whatsapp", "discord").forEach { pluginId ->
+            templatePluginsById[pluginId]?.let { mergedPlugins.put(JSONObject(it.toString())) }
+        }
+        registry.put("plugins", mergedPlugins)
+        registryFile.writeText(registry.toString(2))
+        log("   OpenClaw external channel plugin records merged ($merged)")
     }
 
     private fun readInstalledOpenClawVersion(): String? {

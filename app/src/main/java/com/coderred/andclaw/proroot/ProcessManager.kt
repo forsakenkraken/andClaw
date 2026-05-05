@@ -1746,6 +1746,11 @@ class ProcessManager(
                 val plugins = json.optJSONObject("plugins") ?: JSONObject().also { json.put("plugins", it) }
                 val entries = plugins.optJSONObject("entries") ?: JSONObject().also { plugins.put("entries", it) }
 
+                // WhatsApp
+                val waPlugin = entries.optJSONObject("whatsapp") ?: JSONObject()
+                waPlugin.put("enabled", channelConfig.whatsappEnabled)
+                entries.put("whatsapp", waPlugin)
+
                 // Telegram
                 val tgPlugin = entries.optJSONObject("telegram") ?: JSONObject()
                 tgPlugin.put("enabled", channelConfig.telegramEnabled && channelConfig.telegramBotToken.isNotBlank())
@@ -1755,11 +1760,6 @@ class ProcessManager(
                 val dcPlugin = entries.optJSONObject("discord") ?: JSONObject()
                 dcPlugin.put("enabled", channelConfig.discordEnabled && channelConfig.discordBotToken.isNotBlank())
                 entries.put("discord", dcPlugin)
-
-                // WhatsApp은 코어 채널이므로 plugins.entries 불필요 (stale entry 정리)
-                if (entries.has("whatsapp")) {
-                    entries.remove("whatsapp")
-                }
 
                 configFile.writeText(json.toString(2))
             } catch (e: Exception) {

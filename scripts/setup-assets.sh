@@ -451,6 +451,76 @@ NODE
 
         echo '--- Bundled plugin runtime dependencies: installed during asset build ---'
 
+        echo '--- Installing andClaw-managed external channel plugins ---'
+        OPENCLAW_ASSET_VERSION=\"\$(node -e 'console.log(require(\"/usr/local/lib/node_modules/openclaw/package.json\").version)')\"
+        ANDCLAW_BUNDLED_EXTERNAL_CHANNEL_PLUGINS=\"@openclaw/whatsapp@\$OPENCLAW_ASSET_VERSION @openclaw/discord@\$OPENCLAW_ASSET_VERSION\"
+        ANDCLAW_BUNDLED_PLUGIN_ROOT=/root/.openclaw/andclaw-bundled-plugins
+        ANDCLAW_BUNDLED_PLUGIN_NPM_ROOT=/root/.openclaw/andclaw-bundled-plugins/npm
+        rm -rf \"\$ANDCLAW_BUNDLED_PLUGIN_ROOT\"
+        mkdir -p \"\$ANDCLAW_BUNDLED_PLUGIN_NPM_ROOT\"
+        PYTHON=/usr/bin/python3 \
+          npm_config_python=/usr/bin/python3 \
+          npm install --prefix \"\$ANDCLAW_BUNDLED_PLUGIN_NPM_ROOT\" \
+            --omit=dev --no-audit --no-fund --loglevel=error \
+            \$ANDCLAW_BUNDLED_EXTERNAL_CHANNEL_PLUGINS
+
+        cat > /tmp/write-andclaw-plugin-install-records.cjs <<'NODE'
+const fs = require('node:fs');
+const path = require('node:path');
+const { pathToFileURL } = require('node:url');
+
+(async () => {
+  const version = process.env.OPENCLAW_ASSET_VERSION;
+  const openClawDist = '/usr/local/lib/node_modules/openclaw/dist';
+  const pluginRoot = '/root/.openclaw/andclaw-bundled-plugins';
+  const npmRoot = path.join(pluginRoot, 'npm');
+  const installedAt = new Date().toISOString();
+  const plugins = [
+    { id: 'whatsapp', packageName: '@openclaw/whatsapp' },
+    { id: 'discord', packageName: '@openclaw/discord' },
+  ];
+  const installRecords = {};
+
+  for (const plugin of plugins) {
+    const installPath = path.join(npmRoot, 'node_modules', plugin.packageName);
+    const packageJson = JSON.parse(fs.readFileSync(path.join(installPath, 'package.json'), 'utf8'));
+    installRecords[plugin.id] = {
+      source: 'npm',
+      spec: plugin.packageName + '@' + version,
+      installPath,
+      version: packageJson.version,
+      resolvedName: plugin.packageName,
+      resolvedVersion: packageJson.version,
+      resolvedSpec: plugin.packageName + '@' + packageJson.version,
+      installedAt,
+    };
+  }
+
+  const recordsModuleCandidates = fs.readdirSync(openClawDist)
+    .filter((name) => /^installed-plugin-index-records-[A-Za-z0-9_-]+\.js$/.test(name));
+  if (recordsModuleCandidates.length === 0) {
+    throw new Error('Cannot find OpenClaw installed plugin index records module');
+  }
+  let writeRecords = null;
+  for (const candidate of recordsModuleCandidates) {
+    const mod = await import(pathToFileURL(path.join(openClawDist, candidate)).href);
+    if (typeof mod.c === 'function') {
+      writeRecords = mod.c;
+      break;
+    }
+  }
+  if (!writeRecords) {
+    throw new Error(\"No installed-plugin-index-records candidate exposes the 'c' write function. Candidates tried: \" + recordsModuleCandidates.join(', '));
+  }
+  writeRecords(installRecords);
+  fs.copyFileSync('/root/.openclaw/plugins/installs.json', path.join(pluginRoot, 'install-records.json'));
+})();
+NODE
+        OPENCLAW_ASSET_VERSION=\"\$OPENCLAW_ASSET_VERSION\" node /tmp/write-andclaw-plugin-install-records.cjs
+        rm -f /root/.openclaw/openclaw.json
+        rm -rf /root/.openclaw/plugins
+        echo '--- andClaw-managed external channel plugins: installed ---'
+
         # Windows docker cp에서 symlink 생성 권한 오류를 피하기 위해 .bin 심링크 제거
         find /usr/local/lib/node_modules/openclaw/node_modules -path '*/.bin/*' -type l -delete || true
 
@@ -464,7 +534,7 @@ NODE
         ls -lh /usr/local/bin/openclaw
 
         echo '--- Creating tar bundle ---'
-        cd / && tar cf /tmp/openclaw-arm64.tar usr/local/lib/node_modules/openclaw usr/local/bin/openclaw
+        cd / && tar cf /tmp/openclaw-arm64.tar usr/local/lib/node_modules/openclaw usr/local/bin/openclaw root/.openclaw/andclaw-bundled-plugins
         ls -lh /tmp/openclaw-arm64.tar
         echo '--- DONE ---'
     "
@@ -582,7 +652,7 @@ NODE
         echo "   ⚠ prewarmConfiguredPrimaryModel not found — skip patch not applied"
     fi
 
-    tar cf /tmp/openclaw-arm64.tar usr/
+    tar cf /tmp/openclaw-arm64.tar usr/ root/.openclaw/andclaw-bundled-plugins
     cd / && rm -rf "$PRUNE_DIR"
 
     echo "   호스트에서 gzip 압축 중..."
