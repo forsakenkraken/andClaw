@@ -40,6 +40,7 @@ class GatewayWsClient(
 
     companion object {
         private const val TAG = "GatewayWsClient"
+        private const val GATEWAY_PROTOCOL_VERSION = 4
         private const val MAX_CLI_OUTPUT_CHARS = 1_000_000
         private val METHOD_NAME_REGEX = Regex("^[A-Za-z0-9_.-]+$")
         private val GATEWAY_STATUS_CALL_MUTEX = Mutex()
@@ -183,8 +184,8 @@ class GatewayWsClient(
             call(
                 "connect",
                 JSONObject().apply {
-                    put("minProtocol", 3)
-                    put("maxProtocol", 3)
+                    put("minProtocol", GATEWAY_PROTOCOL_VERSION)
+                    put("maxProtocol", GATEWAY_PROTOCOL_VERSION)
                     put("client", JSONObject().apply {
                         put("id", "openclaw-control-ui")
                         put("version", "dev")
@@ -211,7 +212,11 @@ class GatewayWsClient(
         }
 
         Log.d(TAG, "connect: handshake result=${handshakeResult != null}")
-        return handshakeResult != null
+        if (handshakeResult == null) {
+            close()
+            return false
+        }
+        return true
     }
 
     suspend fun probeGatewayHealth(timeoutMs: Long = 8_000L): Boolean {
@@ -631,7 +636,7 @@ class GatewayWsClient(
         val executeCall: suspend () -> JSONObject? = call@{
             lastCallErrorMessage = null
             lastCallGatewayMessage = null
-            if (!ensureNodeCompatPatchFile()) {
+            if (!hasNodeCompatPatchFile()) {
                 lastCallErrorMessage = "Missing runtime patch file: /root/.openclaw-patch.js"
                 return@call null
             }
@@ -848,40 +853,9 @@ class GatewayWsClient(
         return "for f in /etc/profile /root/.profile; do if [ -f \"\$f\" ] && /bin/sh -n \"\$f\" >/dev/null 2>&1; then . \"\$f\" || true; fi; done;"
     }
 
-    private fun ensureNodeCompatPatchFile(): Boolean {
+    private fun hasNodeCompatPatchFile(): Boolean {
         val patchFile = File(prorootManager.rootfsDir, "root/.openclaw-patch.js")
-        if (patchFile.exists() && patchFile.length() > 0) return true
-
-        val script = buildString {
-            appendLine("const os = require('os');")
-            appendLine("const _ni = os.networkInterfaces;")
-            appendLine("os.networkInterfaces = function() {")
-            appendLine("  try { return _ni.call(this); } catch(e) {")
-            appendLine("    return {")
-            appendLine("      lo: [{")
-            appendLine("        address: '127.0.0.1',")
-            appendLine("        netmask: '255.0.0.0',")
-            appendLine("        family: 'IPv4',")
-            appendLine("        mac: '00:00:00:00:00:00',")
-            appendLine("        internal: true,")
-            appendLine("        cidr: '127.0.0.1/8'")
-            appendLine("      }]")
-            appendLine("    };")
-            appendLine("  }")
-            appendLine("};")
-        }
-
-        return runCatching {
-            patchFile.parentFile?.mkdirs()
-            val tmpName = ".openclaw-patch.js.tmp.${System.currentTimeMillis()}.${Thread.currentThread().id}"
-            val tmpFile = File(patchFile.parentFile, tmpName)
-            tmpFile.writeText(script)
-            if (!tmpFile.renameTo(patchFile)) {
-                patchFile.writeText(script)
-                tmpFile.delete()
-            }
-            true
-        }.getOrDefault(false)
+        return patchFile.exists() && patchFile.length() > 0
     }
 
     private suspend fun executeWithResultCancellable(

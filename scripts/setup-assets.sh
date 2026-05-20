@@ -451,9 +451,9 @@ NODE
 
         echo '--- Bundled plugin runtime dependencies: installed during asset build ---'
 
-        echo '--- Installing andClaw-managed external channel plugins ---'
+        echo '--- Installing andClaw-managed external/runtime plugins ---'
         OPENCLAW_ASSET_VERSION=\"\$(node -e 'console.log(require(\"/usr/local/lib/node_modules/openclaw/package.json\").version)')\"
-        ANDCLAW_BUNDLED_EXTERNAL_CHANNEL_PLUGINS=\"@openclaw/whatsapp@\$OPENCLAW_ASSET_VERSION @openclaw/discord@\$OPENCLAW_ASSET_VERSION\"
+        ANDCLAW_BUNDLED_PLUGINS=\"@openclaw/whatsapp@\$OPENCLAW_ASSET_VERSION @openclaw/discord@\$OPENCLAW_ASSET_VERSION @openclaw/codex@\$OPENCLAW_ASSET_VERSION\"
         ANDCLAW_BUNDLED_PLUGIN_ROOT=/root/.openclaw/andclaw-bundled-plugins
         ANDCLAW_BUNDLED_PLUGIN_NPM_ROOT=/root/.openclaw/andclaw-bundled-plugins/npm
         rm -rf \"\$ANDCLAW_BUNDLED_PLUGIN_ROOT\"
@@ -462,7 +462,9 @@ NODE
           npm_config_python=/usr/bin/python3 \
           npm install --prefix \"\$ANDCLAW_BUNDLED_PLUGIN_NPM_ROOT\" \
             --omit=dev --no-audit --no-fund --loglevel=error \
-            \$ANDCLAW_BUNDLED_EXTERNAL_CHANNEL_PLUGINS
+            \$ANDCLAW_BUNDLED_PLUGINS
+        rm -rf \"\$ANDCLAW_BUNDLED_PLUGIN_NPM_ROOT/node_modules/openclaw\"
+        ln -s ../../../../../usr/local/lib/node_modules/openclaw \"\$ANDCLAW_BUNDLED_PLUGIN_NPM_ROOT/node_modules/openclaw\"
 
         cat > /tmp/write-andclaw-plugin-install-records.cjs <<'NODE'
 const fs = require('node:fs');
@@ -478,6 +480,7 @@ const { pathToFileURL } = require('node:url');
   const plugins = [
     { id: 'whatsapp', packageName: '@openclaw/whatsapp' },
     { id: 'discord', packageName: '@openclaw/discord' },
+    { id: 'codex', packageName: '@openclaw/codex' },
   ];
   const installRecords = {};
 
@@ -519,7 +522,7 @@ NODE
         OPENCLAW_ASSET_VERSION=\"\$OPENCLAW_ASSET_VERSION\" node /tmp/write-andclaw-plugin-install-records.cjs
         rm -f /root/.openclaw/openclaw.json
         rm -rf /root/.openclaw/plugins
-        echo '--- andClaw-managed external channel plugins: installed ---'
+        echo '--- andClaw-managed external/runtime plugins: installed ---'
 
         # Windows docker cp에서 symlink 생성 권한 오류를 피하기 위해 .bin 심링크 제거
         find /usr/local/lib/node_modules/openclaw/node_modules -path '*/.bin/*' -type l -delete || true

@@ -293,7 +293,34 @@ class ProcessManager(
         private const val TAG = "ProcessManager"
         private const val GATEWAY_PORT = 18789
         private const val DEFAULT_MEMORY_SEARCH_PROVIDER = "auto"
-        private const val OPENCLAW_PATCH_VERSION = "openclaw-patch-v6-skip-pricing-fetch"
+        private const val OPENCLAW_PATCH_VERSION = "openclaw-patch-v11-no-codex-prewarm"
+        private const val CODEX_APP_SERVER_MODE = "yolo"
+        private const val CODEX_APP_SERVER_APPROVAL_POLICY = "never"
+        private const val CODEX_APP_SERVER_SANDBOX = "danger-full-access"
+        private const val CODEX_APP_SERVER_TRANSPORT = "stdio"
+        private val CODEX_APP_SERVER_ARGS = listOf("app-server", "--listen", "stdio://")
+        private val ANDCLAW_TRUSTED_OPENCLAW_PLUGIN_IDS = listOf(
+            "anthropic",
+            "browser",
+            "canvas",
+            "codex",
+            "device-pair",
+            "discord",
+            "file-transfer",
+            "github-copilot",
+            "google",
+            "kimi-coding",
+            "memory-core",
+            "minimax",
+            "ollama",
+            "openai",
+            "openrouter",
+            "phone-control",
+            "talk-voice",
+            "telegram",
+            "whatsapp",
+            "zai",
+        )
         private val REMOTE_MEMORY_SEARCH_PROVIDERS = setOf("auto", "openai", "gemini", "voyage", "mistral")
 
         private fun normalizeMemorySearchProvider(raw: String): String {
@@ -628,12 +655,28 @@ class ProcessManager(
                 // 환경변수 구성 (API 키 포함)
                 val extraEnv = buildMap {
                     put("HOME", "/root")
-                    put("PATH", "/usr/local/bin:/usr/bin:/bin")
+                    put("PATH", "${ProrootManager.OPENCLAW_CODEX_APP_SERVER_PATH_DIR}:/usr/local/bin:/usr/bin:/bin")
                     put("LANG", "C.UTF-8")
                     put("UV_USE_IO_URING", "0")
                     put("OPENCLAW_NO_RESPAWN", "1")
                     put("OPENCLAW_DISABLE_BONJOUR", "1")
+                    put("OPENCLAW_CODEX_DISCOVERY_LIVE", "0")
                     put("PLAYWRIGHT_BROWSERS_PATH", "/root/.cache/ms-playwright")
+                    put("RUST_LOG", "info")
+                    val prorootGatewayLog = File(prorootManager.rootfsDir, "tmp/proroot-gateway.log").absolutePath
+                    put("PROROOT_LOG_APPEND", prorootGatewayLog)
+                    put("PROROOT_STUB_LOG", prorootGatewayLog)
+                    put("PROROOT_STUB_TRACE_DYN", "1")
+                    put("PROROOT_STUB_BLOCK_TARGET_SECCOMP", "1")
+                    put("PROROOT_STUB_PRESERVE_SIGSEGV", "1")
+                    put("OPENCLAW_CODEX_APP_SERVER_BIN", ProrootManager.OPENCLAW_CODEX_APP_SERVER_BIN)
+                    put("OPENCLAW_CODEX_APP_SERVER_MODE", CODEX_APP_SERVER_MODE)
+                    put("OPENCLAW_CODEX_APP_SERVER_APPROVAL_POLICY", CODEX_APP_SERVER_APPROVAL_POLICY)
+                    put("OPENCLAW_CODEX_APP_SERVER_SANDBOX", CODEX_APP_SERVER_SANDBOX)
+                    put(
+                        "OPENCLAW_CODEX_APP_SERVER_ARGS",
+                        CODEX_APP_SERVER_ARGS.joinToString(" "),
+                    )
 
                     if (apiProvider == "github-copilot") {
                         putAll(githubCopilotAuthEnv())
@@ -1128,6 +1171,8 @@ class ProcessManager(
 
         synchronized(openClawConfigLock) {
             try {
+                ensureOpenClawDirectoryPermissions()
+
                 val json = if (configFile.exists()) {
                     JSONObject(configFile.readText())
                 } else {
@@ -1599,6 +1644,20 @@ class ProcessManager(
                 controlUi.put("allowInsecureAuth", true)
                 changed = true
             }
+            // Android 외부 브라우저로 여는 로컬 Control UI는 token 인증으로만 보호한다.
+            // OpenClaw 2026.5.18부터 allowInsecureAuth만으로는 브라우저 device pairing을 건너뛰지 않는다.
+            if (controlUi.optBoolean("dangerouslyDisableDeviceAuth", false) != true) {
+                controlUi.put("dangerouslyDisableDeviceAuth", true)
+                changed = true
+            }
+
+            if (ensureAndroidOpenClawExecutionPolicy(json)) {
+                changed = true
+            }
+
+            if (ensureManagedOpenClawPluginPolicy(json)) {
+                changed = true
+            }
 
             // 현재 번들에 없는 플러그인 엔트리 정리 (게이트웨이 부팅 실패 방지)
             val plugins = json.optJSONObject("plugins")
@@ -1645,6 +1704,29 @@ class ProcessManager(
         }
     }
 
+    private fun ensureOpenClawDirectoryPermissions() {
+        val openClawDir = File(prorootManager.rootfsDir, "root/.openclaw")
+        if (!openClawDir.exists() || !openClawDir.isDirectory) return
+        val repaired = normalizeDirectoryPermissions(openClawDir)
+        if (repaired > 0) {
+            addLog("[andClaw] Repaired OpenClaw directory permissions ($repaired dirs)")
+        }
+    }
+
+    private fun normalizeDirectoryPermissions(dir: File): Int {
+        if (!dir.exists() || !dir.isDirectory) return 0
+        val neededRepair = !dir.canRead() || !dir.canWrite() || !dir.canExecute()
+        dir.setReadable(true, false)
+        dir.setWritable(true, true)
+        dir.setExecutable(true, false)
+        val repairedSelf = if (neededRepair) 1 else 0
+        val repairedChildren = dir.listFiles()
+            ?.filter { it.isDirectory }
+            ?.sumOf { normalizeDirectoryPermissions(it) }
+            ?: 0
+        return repairedSelf + repairedChildren
+    }
+
     /**
      * openclaw.json에 채널 설정 블록을 기록한다.
      */
@@ -1653,6 +1735,7 @@ class ProcessManager(
 
         synchronized(openClawConfigLock) {
             try {
+                ensureOpenClawDirectoryPermissions()
                 val json = if (configFile.exists()) {
                     JSONObject(configFile.readText())
                 } else {
@@ -1760,6 +1843,8 @@ class ProcessManager(
                 val dcPlugin = entries.optJSONObject("discord") ?: JSONObject()
                 dcPlugin.put("enabled", channelConfig.discordEnabled && channelConfig.discordBotToken.isNotBlank())
                 entries.put("discord", dcPlugin)
+
+                ensureManagedOpenClawPluginPolicy(json)
 
                 configFile.writeText(json.toString(2))
             } catch (e: Exception) {
@@ -1940,6 +2025,156 @@ class ProcessManager(
     private fun jsonArrayStringListEquals(array: JSONArray?, expected: List<String>): Boolean {
         if (array == null || array.length() != expected.size) return false
         return expected.indices.all { index -> array.optString(index) == expected[index] }
+    }
+
+    private fun ensureAndroidOpenClawExecutionPolicy(json: JSONObject): Boolean {
+        var changed = false
+
+        val tools = json.optJSONObject("tools") ?: JSONObject().also {
+            json.put("tools", it)
+            changed = true
+        }
+        val exec = tools.optJSONObject("exec") ?: JSONObject().also {
+            tools.put("exec", it)
+            changed = true
+        }
+        if (exec.optString("host", "").trim().lowercase() != "gateway") {
+            exec.put("host", "gateway")
+            changed = true
+        }
+
+        val agents = json.optJSONObject("agents") ?: JSONObject().also {
+            json.put("agents", it)
+            changed = true
+        }
+        val defaults = agents.optJSONObject("defaults") ?: JSONObject().also {
+            agents.put("defaults", it)
+            changed = true
+        }
+        val defaultSandbox = defaults.optJSONObject("sandbox") ?: JSONObject().also {
+            defaults.put("sandbox", it)
+            changed = true
+        }
+        if (defaultSandbox.optString("mode", "").trim().lowercase() != "off") {
+            defaultSandbox.put("mode", "off")
+            changed = true
+        }
+
+        changed = ensureOptionalExecHostGateway(defaults) || changed
+
+        val agentList = agents.optJSONArray("list")
+        if (agentList != null) {
+            for (index in 0 until agentList.length()) {
+                val agent = agentList.optJSONObject(index) ?: continue
+                val sandbox = agent.optJSONObject("sandbox")
+                if (sandbox != null && sandbox.optString("mode", "").trim().lowercase() != "off") {
+                    sandbox.put("mode", "off")
+                    changed = true
+                }
+                changed = ensureOptionalExecHostGateway(agent) || changed
+            }
+        }
+
+        changed = ensureCodexAppServerRuntimePolicy(json) || changed
+
+        return changed
+    }
+
+    private fun ensureOptionalExecHostGateway(owner: JSONObject): Boolean {
+        val tools = owner.optJSONObject("tools") ?: return false
+        val exec = tools.optJSONObject("exec") ?: return false
+        if (exec.optString("host", "").trim().lowercase() == "gateway") return false
+        exec.put("host", "gateway")
+        return true
+    }
+
+    private fun ensureCodexAppServerRuntimePolicy(json: JSONObject): Boolean {
+        var changed = false
+        val plugins = json.optJSONObject("plugins") ?: JSONObject().also {
+            json.put("plugins", it)
+            changed = true
+        }
+        val entries = plugins.optJSONObject("entries") ?: JSONObject().also {
+            plugins.put("entries", it)
+            changed = true
+        }
+        val codex = entries.optJSONObject("codex") ?: JSONObject().also {
+            entries.put("codex", it)
+            changed = true
+        }
+        if (codex.optBoolean("enabled", false) != true) {
+            codex.put("enabled", true)
+            changed = true
+        }
+
+        val config = codex.optJSONObject("config") ?: JSONObject().also {
+            codex.put("config", it)
+            changed = true
+        }
+        val appServer = config.optJSONObject("appServer") ?: JSONObject().also {
+            config.put("appServer", it)
+            changed = true
+        }
+
+        if (appServer.optString("transport", "").trim().lowercase() != CODEX_APP_SERVER_TRANSPORT) {
+            appServer.put("transport", CODEX_APP_SERVER_TRANSPORT)
+            changed = true
+        }
+        if (appServer.optString("command", "").trim() != ProrootManager.OPENCLAW_CODEX_APP_SERVER_BIN) {
+            appServer.put("command", ProrootManager.OPENCLAW_CODEX_APP_SERVER_BIN)
+            changed = true
+        }
+        if (!jsonArrayStringListEquals(appServer.optJSONArray("args"), CODEX_APP_SERVER_ARGS)) {
+            appServer.put("args", JSONArray(CODEX_APP_SERVER_ARGS))
+            changed = true
+        }
+        if (appServer.optString("mode", "").trim().lowercase() != CODEX_APP_SERVER_MODE) {
+            appServer.put("mode", CODEX_APP_SERVER_MODE)
+            changed = true
+        }
+        if (appServer.optString("approvalPolicy", "").trim().lowercase() != CODEX_APP_SERVER_APPROVAL_POLICY) {
+            appServer.put("approvalPolicy", CODEX_APP_SERVER_APPROVAL_POLICY)
+            changed = true
+        }
+        if (appServer.optString("sandbox", "").trim().lowercase() != CODEX_APP_SERVER_SANDBOX) {
+            appServer.put("sandbox", CODEX_APP_SERVER_SANDBOX)
+            changed = true
+        }
+
+        return changed
+    }
+
+    private fun ensureManagedOpenClawPluginPolicy(json: JSONObject): Boolean {
+        var changed = false
+        val plugins = json.optJSONObject("plugins") ?: JSONObject().also {
+            json.put("plugins", it)
+            changed = true
+        }
+
+        if (plugins.optString("bundledDiscovery", "") != "allowlist") {
+            plugins.put("bundledDiscovery", "allowlist")
+            changed = true
+        }
+
+        val allow = plugins.optJSONArray("allow")
+        val merged = linkedSetOf<String>()
+        if (allow != null) {
+            for (index in 0 until allow.length()) {
+                val pluginId = allow.optString(index).trim().lowercase()
+                if (pluginId.isNotEmpty()) {
+                    merged += pluginId
+                }
+            }
+        }
+        ANDCLAW_TRUSTED_OPENCLAW_PLUGIN_IDS.forEach { merged += it }
+
+        val expected = merged.toList()
+        if (!jsonArrayStringListEquals(allow, expected)) {
+            plugins.put("allow", JSONArray(expected))
+            changed = true
+        }
+
+        return changed
     }
 
     private fun mergeRequiredExtraArgs(array: JSONArray?): List<String> {
@@ -2446,9 +2681,13 @@ class ProcessManager(
             !patchFile.readText().contains("Module._resolveFilename") ||
             !patchFile.readText().contains("realpathSync.native") ||
             !patchFile.readText().contains("dns.setServers") ||
+            patchFile.readText().contains("scheduleCodexAppServerPrewarm") ||
+            patchFile.readText().contains("OPENCLAW_PREWARM_CODEX_APP_SERVER") ||
+            patchFile.readText().contains("openclaw-codex-prewarm") ||
             patchFile.readText().contains("_origLookup.call") ||
             patchFile.readText().contains("_cpSpawn") ||
-            patchFile.readText().contains("handle.sync")
+            patchFile.readText().contains("handle.sync") ||
+            patchFile.readText().contains("Suppressed self-SIGSYS kill")
         if (needsUpdate) {
             addLog("[andClaw] Creating Node.js compatibility patch...")
             patchFile.parentFile?.mkdirs()
@@ -2585,7 +2824,6 @@ class ProcessManager(
                 appendLine("  }")
                 appendLine("};")
                 appendLine()
-                appendLine()
                 appendLine("const os = require('os');")
                 appendLine("const _ni = os.networkInterfaces;")
                 appendLine("os.networkInterfaces = function() {")
@@ -2708,6 +2946,10 @@ class ProcessManager(
             // 서버 포트가 열렸지만 아직 startup 작업 진행 중 — STARTING 유지.
             // Browser control listening 로그가 나오면 RUNNING으로 전환.
             addLog("[andClaw] Gateway port open, waiting for full startup...")
+            startPairingObserver()
+        }
+
+        if (lineLower.contains("[gateway]") && lineLower.contains("http server listening")) {
             startPairingObserver()
         }
 

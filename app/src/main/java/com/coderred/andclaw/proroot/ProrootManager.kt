@@ -45,6 +45,8 @@ class ProrootManager(
         private const val PLAYWRIGHT_CHROME_MARKER = ".playwright_chrome_path"
         const val OPENCLAW_NODE_BIN = "/usr/local/bin/node"
         const val OPENCLAW_ENTRYPOINT = "/usr/local/lib/node_modules/openclaw/openclaw.mjs"
+        const val OPENCLAW_CODEX_APP_SERVER_BIN = "/root/.openclaw/andclaw-bundled-plugins/npm/node_modules/@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl/codex/codex"
+        const val OPENCLAW_CODEX_APP_SERVER_PATH_DIR = "/root/.openclaw/andclaw-bundled-plugins/npm/node_modules/@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl/path"
         const val GUEST_HOOK_LIB_PATH = "/root/.proroot/libproroot-runtime.so"
 
         const val GUEST_VFORK_SHIM_PATH = "/root/.proroot/libvfork_shim.so"
@@ -515,8 +517,18 @@ class ProrootManager(
     fun buildGatewayCommand(runtime: ExecutionRuntime = currentRuntime): List<String> {
         return buildProrootCommand(
                 "export UV_USE_IO_URING=0 && " +
+                "export RUST_LOG=info && " +
+                "export PATH=$OPENCLAW_CODEX_APP_SERVER_PATH_DIR:/usr/local/bin:/usr/bin:/bin && " +
+                "export OPENCLAW_CODEX_APP_SERVER_BIN=$OPENCLAW_CODEX_APP_SERVER_BIN && " +
+                "export OPENCLAW_CODEX_APP_SERVER_ARGS='app-server --listen stdio://' && " +
+                "export OPENCLAW_CODEX_APP_SERVER_MODE=yolo && " +
+                "export OPENCLAW_CODEX_APP_SERVER_APPROVAL_POLICY=never && " +
+                "export OPENCLAW_CODEX_APP_SERVER_SANDBOX=danger-full-access && " +
+                "export OPENCLAW_CODEX_DISCOVERY_LIVE=0 && " +
                 "export NODE_OPTIONS='--require /root/.openclaw-patch.js' && " +
                 "export NODE_COMPILE_CACHE=/root/.cache/node-compile-cache && " +
+                "mkdir -p /root/.openclaw/workspace && " +
+                "cd /root/.openclaw/workspace && " +
                 "openclaw gateway run",
             runtime = runtime,
         )
@@ -553,9 +565,10 @@ class ProrootManager(
             put("HOME", homeDir.absolutePath)
             put("PROROOT_LIB_PATH", nativeHookLibPath)
             put("PROROOT_LINKER_PATH", nativeLinkerPath)
+            put("PROROOT_TRAMPOLINE_PATH", nativeTrampolinePath)
             put("PROROOT_ROOTFS", rootfsDir.absolutePath)
             put("PROROOT_GUEST_EXE", OPENCLAW_NODE_BIN)
-            put("PROROOT_TRAMPOLINE_PATH", nativeTrampolinePath)
+            put("PROROOT_TMP_DIR", context.filesDir.absolutePath)
             if (guestVforkShimHostPath.exists()) {
                 put("PROROOT_GUEST_LD_PRELOAD", GUEST_VFORK_SHIM_PATH)
             }

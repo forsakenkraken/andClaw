@@ -222,12 +222,12 @@ class PreferencesManager(private val context: Context) {
         return normalizedModelId.contains("codex") || normalizedModelId in BARE_CODEX_MODEL_IDS
     }
 
-    private fun hasGitHubCopilotAuthProfile(): Boolean {
+    private fun hasGitHubCopilotAuthProfile(snapshot: Preferences? = null): Boolean {
         if (hasGitHubCopilotEnvAuth()) return true
 
-        val prorootManager = runCatching { ProrootManager(context) }.getOrNull() ?: return false
-        val rootfsDir = prorootManager.rootfsDir
-        if (!rootfsDir.exists()) return false
+        val cachedAuthenticated = snapshot?.get(KEY_GITHUB_COPILOT_AUTHENTICATED) == true
+        val rootfsDir = java.io.File(context.filesDir, "rootfs")
+        if (!rootfsDir.exists()) return cachedAuthenticated
 
         val authFile = java.io.File(rootfsDir, "root/.openclaw/agents/main/agent/auth-profiles.json")
         val hasStoredProfile = if (authFile.exists()) {
@@ -249,12 +249,7 @@ class PreferencesManager(private val context: Context) {
         }
         if (hasStoredProfile) return true
 
-        return runCatching {
-            val authStatusCommand = "export NODE_OPTIONS='--require /root/.openclaw-patch.js' && " +
-                "openclaw models status --json 2>&1"
-            val authStatusOutput = prorootManager.executeAndCapture(authStatusCommand)
-            hasOpenClawModelsStatusAuth(authStatusOutput, "github-copilot")
-        }.getOrDefault(false)
+        return cachedAuthenticated
     }
 
     companion object {
@@ -1304,6 +1299,10 @@ private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fa
             prefs[KEY_API_PROVIDER] = normalizedProvider
 
             val providerKey = normalizeProvider(normalizedProvider)
+            val selectedIdsFromProviderBucket = selectedByProvider[providerKey].orEmpty()
+                .map { canonicalizeModelIdForProvider(providerKey, it) }
+                .filter { it.isNotBlank() }
+                .distinct()
             val selectedIds = resolveStoredSelectedIdsForProvider(
                 snapshot = prefs,
                 provider = providerKey,
@@ -1324,6 +1323,74 @@ private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fa
             } else {
                 selectedByProvider.remove(providerKey)
                 metadataByProvider.remove(providerKey)
+            }
+
+            if (selectedIdsFromProviderBucket.isNotEmpty() && selectedIds.isNotEmpty()) {
+                val providerLocalPrimary = when (providerKey) {
+                    "openai-compatible" -> {
+                        activeProfile?.primaryModel
+                            .orEmpty()
+                            .trim()
+                            .removePrefix("openai-compatible/")
+                            .takeIf { it.isNotBlank() && selectedIds.contains(it) }
+                            .orEmpty()
+                            .ifBlank {
+                                prefs[KEY_OPENAI_COMPATIBLE_MODEL_ID]
+                                    .orEmpty()
+                                    .trim()
+                                    .removePrefix("openai-compatible/")
+                                    .takeIf { it.isNotBlank() && selectedIds.contains(it) }
+                                    .orEmpty()
+                            }
+                    }
+                    "ollama" -> prefs[KEY_OLLAMA_MODEL_ID]
+                        .orEmpty()
+                        .trim()
+                        .removePrefix("ollama/")
+                        .removeSuffix(":latest")
+                        .takeIf { it.isNotBlank() && selectedIds.contains(it) }
+                        .orEmpty()
+                    "ollama-cloud" -> prefs[KEY_OLLAMA_CLOUD_MODEL_ID]
+                        .orEmpty()
+                        .trim()
+                        .removePrefix("ollama-cloud/")
+                        .removePrefix("ollama/")
+                        .removeSuffix(":latest")
+                        .takeIf { it.isNotBlank() && selectedIds.contains(it) }
+                        .orEmpty()
+                    else -> ""
+                }
+                val legacyPrimary = canonicalizeModelIdForProvider(
+                    providerKey,
+                    prefs[KEY_SELECTED_MODEL].orEmpty(),
+                ).takeIf {
+                    normalizeProvider(prefs[KEY_SELECTED_MODEL_PROVIDER].orEmpty()) == providerKey &&
+                        it.isNotBlank() &&
+                        selectedIds.contains(it) &&
+                        isLegacyModelCompatibleWithProvider(providerKey, it)
+                }.orEmpty()
+                val primaryModelId = providerLocalPrimary
+                    .ifBlank { legacyPrimary }
+                    .ifBlank { selectedIds.first() }
+                val metadata = canonicalizeMetadataByIdForProvider(
+                    providerKey,
+                    metadataByProvider[providerKey].orEmpty(),
+                )[primaryModelId] ?: resolveDefaultModelMetadata(providerKey, primaryModelId)
+
+                prefs[KEY_SELECTED_MODEL] = primaryModelId
+                prefs[KEY_SELECTED_MODEL_PROVIDER] = providerKey
+                prefs[KEY_SELECTED_MODEL_REASONING] = metadata.supportsReasoning
+                prefs[KEY_SELECTED_MODEL_IMAGES] = metadata.supportsImages
+                prefs[KEY_SELECTED_MODEL_CONTEXT] = metadata.contextLength.toString()
+                prefs[KEY_SELECTED_MODEL_MAX_OUTPUT] = metadata.maxOutputTokens.toString()
+
+                if (providerKey == "openai-compatible") {
+                    prefs[KEY_OPENAI_COMPATIBLE_MODEL_ID] = primaryModelId
+                } else if (providerKey == "ollama") {
+                    prefs[KEY_OLLAMA_MODEL_ID] = primaryModelId
+                } else if (providerKey == "ollama-cloud") {
+                    prefs[KEY_OLLAMA_CLOUD_MODEL_ID] = primaryModelId
+                }
             }
 
             if (selectedByProvider.isEmpty()) {
@@ -1425,7 +1492,7 @@ private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fa
             "openrouter" -> snapshot[KEY_API_KEY_OPENROUTER] ?: legacy
             "anthropic" -> snapshot[KEY_API_KEY_ANTHROPIC].orEmpty()
             "openai", "openai-codex" -> snapshot[KEY_API_KEY_OPENAI].orEmpty()
-            "github-copilot" -> if (hasGitHubCopilotAuthProfile()) "__github_copilot_auth__" else ""
+            "github-copilot" -> if (hasGitHubCopilotAuthProfile(snapshot)) "__github_copilot_auth__" else ""
             "zai" -> snapshot[KEY_API_KEY_ZAI].orEmpty()
             "kimi-coding" -> snapshot[KEY_API_KEY_KIMI_CODING].orEmpty()
             "minimax" -> snapshot[KEY_API_KEY_MINIMAX].orEmpty()
@@ -1450,7 +1517,7 @@ private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fa
             "openrouter" -> snapshot[KEY_API_KEY_OPENROUTER] ?: legacy
             "anthropic" -> snapshot[KEY_API_KEY_ANTHROPIC].orEmpty()
             "openai", "openai-codex" -> snapshot[KEY_API_KEY_OPENAI].orEmpty()
-            "github-copilot" -> if (hasGitHubCopilotAuthProfile()) "__github_copilot_auth__" else ""
+            "github-copilot" -> if (hasGitHubCopilotAuthProfile(snapshot)) "__github_copilot_auth__" else ""
             "zai" -> snapshot[KEY_API_KEY_ZAI].orEmpty()
             "kimi-coding" -> snapshot[KEY_API_KEY_KIMI_CODING].orEmpty()
             "minimax" -> snapshot[KEY_API_KEY_MINIMAX].orEmpty()
@@ -2059,7 +2126,7 @@ private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fa
             val globalSelectedModelIds = resolveSelectedModelIds(normalizedGlobalPrimaryProvider)
             if (globalSelectedModelIds.isNotEmpty()) {
                 // 런타임 provider는 현재 설정 탭이 아니라 전역 기본 모델의 owner를 따른다.
-                // 사용자가 다른 provider 탭을 열어도 기본 모델을 바꾸기 전까지는 기존 runtime provider를 유지해야 한다.
+                // provider 전환은 setApiProvider에서 대상 provider의 저장된 선택을 전역 기본으로 승격한다.
                 provider = normalizedGlobalPrimaryProvider
                 selectedModelIds = globalSelectedModelIds
             }
@@ -2092,7 +2159,7 @@ private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fa
             "openrouter" -> snapshot[KEY_API_KEY_OPENROUTER] ?: legacyApiKey
             "anthropic" -> snapshot[KEY_API_KEY_ANTHROPIC].orEmpty()
             "openai", "openai-codex" -> snapshot[KEY_API_KEY_OPENAI].orEmpty()
-            "github-copilot" -> if (hasGitHubCopilotAuthProfile()) "__github_copilot_auth__" else ""
+            "github-copilot" -> if (hasGitHubCopilotAuthProfile(snapshot)) "__github_copilot_auth__" else ""
             "zai" -> snapshot[KEY_API_KEY_ZAI].orEmpty()
             "kimi-coding" -> snapshot[KEY_API_KEY_KIMI_CODING].orEmpty()
             "minimax" -> snapshot[KEY_API_KEY_MINIMAX].orEmpty()

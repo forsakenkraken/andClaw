@@ -12,7 +12,7 @@ object OpenClawModelCatalogReader {
     private const val OLLAMA_DEFAULT_CONTEXT_WINDOW = 128_000
     private const val OLLAMA_DEFAULT_MAX_TOKENS = 8_192
     const val LEGACY_BUILTIN_MODELS_PATH =
-        "usr/local/lib/node_modules/openclaw/node_modules/@mariozechner/pi-ai/dist/models.generated.js"
+        "usr/local/lib/node_modules/openclaw/node_modules/@earendil-works/pi-ai/dist/models.generated.js"
 
     @Volatile
     private var appContext: android.content.Context? = null

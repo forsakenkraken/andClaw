@@ -212,7 +212,7 @@ object ArchiveUtils {
 
     private fun setFilePermissions(file: File, mode: Int) {
         // owner/group/other execute bit: 0111 = 0x49
-        val isExecutable = (mode and 73) != 0 // 0111 in octal = 73 in decimal
+        val isExecutable = file.isDirectory || (mode and 73) != 0 // 0111 in octal = 73 in decimal
         file.setReadable(true, false)
         file.setExecutable(isExecutable, false)
         file.setWritable(true, true)

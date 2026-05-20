@@ -3149,10 +3149,7 @@ class SettingsViewModel(
                 if (hasStoredProfile) return true
             }
 
-            val authStatusCommand = "export NODE_OPTIONS='--require /root/.openclaw-patch.js' && " +
-                "openclaw models status --json 2>&1"
-            val authStatusOutput = prorootManager.executeAndCapture(authStatusCommand)
-            hasOpenClawModelsStatusAuth(authStatusOutput, "github-copilot")
+            false
         } catch (_: Exception) {
             false
         }
