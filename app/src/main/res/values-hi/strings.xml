@@ -234,6 +234,22 @@
     <string name="pairing_notification_text">%1$s: %2$s</string>
     <string name="settings_codex_oauth_title">Codex में साइन इन करें</string>
     <string name="settings_codex_oauth_signing_in">साइन इन किया जा रहा है…</string>
+    <string name="settings_codex_oauth_reset_title">Codex साइन-इन रीसेट करें</string>
+    <string name="settings_codex_oauth_reset_desc">सहेजी गई Codex स्थिति हटाएं</string>
+    <string name="settings_codex_oauth_reset_confirm_message">सहेजी गई Codex साइन-इन स्थिति हटाई जाएगी ताकि फिर से साइन इन किया जा सके। अन्य प्रदाता अपरिवर्तित रहेंगे।</string>
+    <string name="settings_codex_oauth_reset_action">रीसेट करें</string>
+    <string name="settings_codex_oauth_reset_running">रीसेट किया जा रहा है…</string>
+    <string name="settings_codex_oauth_reset_success">Codex साइन-इन रीसेट हो गया है। जारी रखने के लिए फिर से साइन इन करें।</string>
+    <string name="settings_codex_oauth_reset_noop">सहेजा गया Codex साइन-इन नहीं मिला।</string>
+    <string name="settings_codex_oauth_reset_failed">Codex साइन-इन रीसेट विफल: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_title">Codex डायग्नोस्टिक्स</string>
+    <string name="settings_codex_oauth_diagnostics_desc">सहेजी गई स्थिति जांचें</string>
+    <string name="settings_codex_oauth_diagnostics_running">जांच की जा रही है…</string>
+    <string name="settings_codex_oauth_diagnostics_result">Codex डायग्नोस्टिक्स\n%1$s</string>
+    <string name="settings_codex_oauth_diagnostics_failed">Codex डायग्नोस्टिक्स विफल: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_view_full">पूरा डायग्नोस्टिक देखें</string>
+    <string name="settings_codex_oauth_diagnostics_copy">कॉपी करें</string>
+    <string name="settings_codex_oauth_diagnostics_copied">Codex डायग्नोस्टिक्स कॉपी हो गए।</string>
     <string name="settings_github_copilot_login_title">GitHub में साइन इन करें</string>
     <string name="settings_github_copilot_login_signing_in">साइन इन की प्रतीक्षा…</string>
     <string name="settings_github_copilot_login_code">कोड: %1$s</string>
@@ -345,9 +361,5 @@
     <string name="settings_transfer_export_success">ट्रांसफर निर्यात पूरा हुआ।</string>
     <string name="settings_transfer_share_failed">ट्रांसफर फ़ाइल साझा नहीं की जा सकी।</string>
 </resources>
-
-
-
-
 
 

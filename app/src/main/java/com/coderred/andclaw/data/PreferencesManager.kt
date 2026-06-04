@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.coderred.andclaw.proroot.ExecutionRuntime
+import com.coderred.andclaw.proroot.OpenClawCodexModelScope
 import com.coderred.andclaw.proroot.OpenClawModelCatalogReader
 import com.coderred.andclaw.proroot.ProrootManager
 import java.io.IOException
@@ -192,8 +193,11 @@ class PreferencesManager(private val context: Context) {
     }
 
     private fun resolveInstalledCodexEntries(rootfsDir: java.io.File): List<OpenClawModelCatalogReader.ModelEntry> {
-        val directCodexEntries = OpenClawModelCatalogReader.loadProviderModels(rootfsDir, "openai-codex")
+        val installedOpenClawVersion = OpenClawCodexModelScope.readInstalledOpenClawVersion(rootfsDir)
+        val providerScope = OpenClawCodexModelScope.providerForInstalledVersion(installedOpenClawVersion)
+        val directCodexEntries = OpenClawModelCatalogReader.loadProviderModels(rootfsDir, providerScope)
         if (directCodexEntries.isNotEmpty()) return directCodexEntries.distinctBy { it.id.lowercase() }
+        if (providerScope == OpenClawCodexModelScope.CODEX_PROVIDER) return emptyList()
 
         val legacyCodexEntries = OpenClawModelCatalogReader.loadProviderModels(rootfsDir, "openai")
             .asSequence()
@@ -211,10 +215,7 @@ class PreferencesManager(private val context: Context) {
     }
 
     private fun normalizeCodexModelIdForComparison(modelId: String): String {
-        return modelId.trim()
-            .removePrefix("openai-codex/")
-            .removePrefix("openai/")
-            .lowercase()
+        return OpenClawCodexModelScope.normalizedBareModelId(modelId)
     }
 
     private fun isLegacyOpenAiCodexModelId(modelId: String): Boolean {
@@ -469,6 +470,7 @@ private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fa
                 "anthropic",
                 "openai",
                 "openai-codex",
+                "codex",
                 "github-copilot",
                 "openai-compatible",
                 "ollama-cloud",
@@ -658,6 +660,7 @@ private val OLLAMA_MANUAL_FALLBACK_KEY = booleanPreferencesKey("ollama_manual_fa
                 "openrouter" -> providerPrefix != "openai-compatible" && providerPrefix != "openai-codex"
                 "openai-codex" -> {
                     providerPrefix == "openai-codex" ||
+                        providerPrefix == "codex" ||
                         (providerPrefix == "openai" &&
                             trimmedModelId.substringAfter("openai/").lowercase().contains("codex"))
                 }

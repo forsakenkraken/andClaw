@@ -293,7 +293,7 @@ class ProcessManager(
         private const val TAG = "ProcessManager"
         private const val GATEWAY_PORT = 18789
         private const val DEFAULT_MEMORY_SEARCH_PROVIDER = "auto"
-        private const val OPENCLAW_PATCH_VERSION = "openclaw-patch-v11-no-codex-prewarm"
+        private const val OPENCLAW_PATCH_VERSION = "openclaw-patch-v12-codex-header-metrics"
         private const val CODEX_APP_SERVER_MODE = "yolo"
         private const val CODEX_APP_SERVER_APPROVAL_POLICY = "never"
         private const val CODEX_APP_SERVER_SANDBOX = "danger-full-access"
@@ -647,6 +647,10 @@ class ProcessManager(
                     return@launch
                 }
                 prorootManager.prepareRuntime(runtimeSnapshot)
+                val osReleaseRepair = runCatching { prorootManager.repairRootfsOsReleaseFiles() }.getOrNull()
+                if (osReleaseRepair?.changed == true) {
+                    addLog("[andClaw] Rootfs OS release repaired before gateway start: ${osReleaseRepair.diagnosticSummary()}")
+                }
                 ensureStartupAttemptStillValid()
 
                 // proot/proroot 명령어 구성
@@ -655,7 +659,7 @@ class ProcessManager(
                 // 환경변수 구성 (API 키 포함)
                 val extraEnv = buildMap {
                     put("HOME", "/root")
-                    put("PATH", "${ProrootManager.OPENCLAW_CODEX_APP_SERVER_PATH_DIR}:/usr/local/bin:/usr/bin:/bin")
+                    put("PATH", "${prorootManager.codexAppServerPathDir}:/usr/local/bin:/usr/bin:/bin")
                     put("LANG", "C.UTF-8")
                     put("UV_USE_IO_URING", "0")
                     put("OPENCLAW_NO_RESPAWN", "1")
@@ -669,7 +673,7 @@ class ProcessManager(
                     put("PROROOT_STUB_TRACE_DYN", "1")
                     put("PROROOT_STUB_BLOCK_TARGET_SECCOMP", "1")
                     put("PROROOT_STUB_PRESERVE_SIGSEGV", "1")
-                    put("OPENCLAW_CODEX_APP_SERVER_BIN", ProrootManager.OPENCLAW_CODEX_APP_SERVER_BIN)
+                    put("OPENCLAW_CODEX_APP_SERVER_BIN", prorootManager.codexAppServerBin)
                     put("OPENCLAW_CODEX_APP_SERVER_MODE", CODEX_APP_SERVER_MODE)
                     put("OPENCLAW_CODEX_APP_SERVER_APPROVAL_POLICY", CODEX_APP_SERVER_APPROVAL_POLICY)
                     put("OPENCLAW_CODEX_APP_SERVER_SANDBOX", CODEX_APP_SERVER_SANDBOX)
@@ -1205,6 +1209,13 @@ class ProcessManager(
                 }
             }
 
+            val installedOpenClawVersion = readInstalledOpenClawVersion()
+            val installedCodexBareModelIds = if (apiProvider == "openai-codex") {
+                readInstalledCodexBareModelIds(installedOpenClawVersion)
+            } else {
+                emptySet()
+            }
+
             val normalizedSelectedEntries = selectedModels
                 .mapNotNull { entry ->
                     val modelId = entry.id.trim()
@@ -1236,7 +1247,10 @@ class ProcessManager(
                     "openrouter" -> "openrouter/free"
                     "anthropic" -> "claude-sonnet-4-5"
                     "openai" -> "gpt-5-mini"
-                    "openai-codex" -> "gpt-5.3-codex"
+                    "openai-codex" -> OpenClawCodexModelScope.preferredBareModelId(
+                        installedOpenClawVersion,
+                        installedCodexBareModelIds,
+                    )
                     "github-copilot" -> "gpt-4o"
                     "zai" -> "glm-5"
                     "kimi-coding" -> "k2p5"
@@ -1276,15 +1290,11 @@ class ProcessManager(
                         }
                         "openai/$id"
                     }
-                    "openai-codex" -> {
-                        val id = when {
-                            modelId.startsWith("openai/") -> modelId.removePrefix("openai/")
-                            modelId.startsWith("openai-codex/") -> modelId.removePrefix("openai-codex/")
-                            modelId.isNotBlank() -> modelId
-                            else -> "gpt-5.3-codex"
-                        }
-                        "openai-codex/$id"
-                    }
+                    "openai-codex" -> OpenClawCodexModelScope.scopedModelId(
+                        installedOpenClawVersion,
+                        modelId,
+                        installedCodexBareModelIds,
+                    )
                     "github-copilot" -> {
                         val id = when {
                             modelId.startsWith("github-copilot/") -> modelId.removePrefix("github-copilot/")
@@ -1619,6 +1629,7 @@ class ProcessManager(
                 apiProvider = apiProvider,
                 selectedEntries = normalizedSelectedEntries,
                 providerScopedModels = targetModels.toSet(),
+                installedOpenClawVersion = installedOpenClawVersion,
             )
 
                 // gateway 설정 (mode 및 controlUi.allowedOrigins)
@@ -2120,8 +2131,9 @@ class ProcessManager(
             appServer.put("transport", CODEX_APP_SERVER_TRANSPORT)
             changed = true
         }
-        if (appServer.optString("command", "").trim() != ProrootManager.OPENCLAW_CODEX_APP_SERVER_BIN) {
-            appServer.put("command", ProrootManager.OPENCLAW_CODEX_APP_SERVER_BIN)
+        val resolvedCodexBin = prorootManager.codexAppServerBin
+        if (appServer.optString("command", "").trim() != resolvedCodexBin) {
+            appServer.put("command", resolvedCodexBin)
             changed = true
         }
         if (!jsonArrayStringListEquals(appServer.optJSONArray("args"), CODEX_APP_SERVER_ARGS)) {
@@ -2414,20 +2426,27 @@ class ProcessManager(
         apiProvider: String,
         selectedEntries: List<ModelSelectionEntry>,
         providerScopedModels: Set<String>,
+        installedOpenClawVersion: String?,
     ) {
-        val selectedModelIds = selectedEntries
-            .map { it.id.trim() }
-            .filter { it.isNotBlank() }
-            .toSet()
+        val selectedModelIds = selectedAgentModelIds(
+            apiProvider = apiProvider,
+            selectedEntries = selectedEntries,
+            providerScopedModels = providerScopedModels,
+        )
         if (selectedModelIds.isEmpty() || providerScopedModels.isEmpty()) return
 
-        sanitizeAgentModelsJson(apiProvider, selectedModelIds)
-        sanitizeAgentSessionsJson(selectedModelIds, providerScopedModels)
+        val targetProvider = targetAgentModelProvider(
+            apiProvider = apiProvider,
+            installedOpenClawVersion = installedOpenClawVersion,
+        )
+        sanitizeAgentModelsJson(apiProvider, selectedModelIds, targetProvider)
+        sanitizeAgentSessionsJson(apiProvider, selectedModelIds, providerScopedModels, targetProvider)
     }
 
     private fun sanitizeAgentModelsJson(
         apiProvider: String,
         selectedModelIds: Set<String>,
+        targetProvider: String,
     ) {
         val file = modelsJsonFile()
         if (!file.exists()) return
@@ -2436,12 +2455,14 @@ class ProcessManager(
             val root = JSONObject(file.readText())
             val providers = root.optJSONObject("providers") ?: return
             val allowedProviders = modelsJsonProviderNamesFor(apiProvider)
+            val shouldRewriteProvider = shouldRewriteAgentModelProvider(apiProvider)
             val providerKeys = providers.keys().asSequence().toList()
             var changed = false
 
             providerKeys.forEach { provider ->
+                val normalizedProvider = provider.trim().lowercase()
                 val providerObject = providers.optJSONObject(provider)
-                if (provider !in allowedProviders || providerObject == null) {
+                if (normalizedProvider !in allowedProviders || providerObject == null) {
                     providers.remove(provider)
                     changed = true
                     return@forEach
@@ -2456,18 +2477,38 @@ class ProcessManager(
 
                 val allowedIds = selectedModelIdsForModelsJsonProvider(apiProvider, selectedModelIds)
                 val filteredModels = JSONArray()
+                var modelsChanged = false
                 for (index in 0 until models.length()) {
                     val modelObject = models.optJSONObject(index) ?: continue
-                    val modelId = modelObject.optString("id").trim()
+                    val rawModelId = modelObject.optString("id").trim()
+                    val modelId = normalizeAgentModelsJsonModelId(apiProvider, rawModelId)
                     if (modelId in allowedIds) {
-                        filteredModels.put(modelObject)
+                        if (modelId != rawModelId) {
+                            filteredModels.put(JSONObject(modelObject.toString()).apply {
+                                put("id", modelId)
+                            })
+                            modelsChanged = true
+                        } else {
+                            filteredModels.put(modelObject)
+                        }
                     }
                 }
 
                 if (filteredModels.length() == 0) {
                     providers.remove(provider)
                     changed = true
-                } else if (filteredModels.length() != models.length()) {
+                } else if (shouldRewriteProvider && (normalizedProvider != targetProvider || provider != targetProvider)) {
+                    val updatedProviderObject = JSONObject(providerObject.toString()).apply {
+                        put("models", filteredModels)
+                    }
+                    val mergedProviderObject = mergeAgentProviderModelsJson(
+                        existing = providers.optJSONObject(targetProvider),
+                        incoming = updatedProviderObject,
+                    )
+                    providers.put(targetProvider, mergedProviderObject)
+                    providers.remove(provider)
+                    changed = true
+                } else if (filteredModels.length() != models.length() || modelsChanged) {
                     providerObject.put("models", filteredModels)
                     changed = true
                 }
@@ -2486,8 +2527,10 @@ class ProcessManager(
     }
 
     private fun sanitizeAgentSessionsJson(
+        apiProvider: String,
         selectedModelIds: Set<String>,
         providerScopedModels: Set<String>,
+        targetProvider: String,
     ) {
         val file = File(prorootManager.rootfsDir, "root/.openclaw/agents/main/sessions/sessions.json")
         if (!file.exists()) return
@@ -2501,6 +2544,7 @@ class ProcessManager(
                 val entry = root.optJSONObject(key) ?: return@forEach
                 val overrideModel = entry.optString("modelOverride").trim()
                 if (overrideModel.isNotBlank() && !isSelectedAgentModelReference(
+                        apiProvider = apiProvider,
                         provider = entry.optString("providerOverride").trim(),
                         model = overrideModel,
                         selectedModelIds = selectedModelIds,
@@ -2512,10 +2556,20 @@ class ProcessManager(
                     entry.remove("modelOverrideSource")
                     entry.remove("modelOverrideCompactionCount")
                     changed = true
+                } else if (overrideModel.isNotBlank() && normalizeSelectedAgentSessionModelState(
+                        apiProvider = apiProvider,
+                        targetProvider = targetProvider,
+                        entry = entry,
+                        providerKey = "providerOverride",
+                        modelKey = "modelOverride",
+                    )
+                ) {
+                    changed = true
                 }
 
                 val model = entry.optString("model").trim()
                 if (model.isNotBlank() && !isSelectedAgentModelReference(
+                        apiProvider = apiProvider,
                         provider = entry.optString("modelProvider").trim(),
                         model = model,
                         selectedModelIds = selectedModelIds,
@@ -2524,6 +2578,15 @@ class ProcessManager(
                 ) {
                     entry.remove("modelProvider")
                     entry.remove("model")
+                    changed = true
+                } else if (model.isNotBlank() && normalizeSelectedAgentSessionModelState(
+                        apiProvider = apiProvider,
+                        targetProvider = targetProvider,
+                        entry = entry,
+                        providerKey = "modelProvider",
+                        modelKey = "model",
+                    )
+                ) {
                     changed = true
                 }
             }
@@ -2538,6 +2601,7 @@ class ProcessManager(
     }
 
     private fun isSelectedAgentModelReference(
+        apiProvider: String,
         provider: String,
         model: String,
         selectedModelIds: Set<String>,
@@ -2545,11 +2609,25 @@ class ProcessManager(
     ): Boolean {
         val normalizedModel = model.trim()
         if (normalizedModel.isBlank()) return false
-        if (normalizedModel in selectedModelIds) return true
+
+        val normalizedProvider = provider.trim().lowercase()
+        val allowedProviders = agentProviderNamesForApiProvider(apiProvider)
+        if (normalizedProvider.isNotBlank() && normalizedProvider !in allowedProviders) return false
         if (normalizedModel in providerScopedModels) return true
 
-        val providerAliases = providerAliasesForAgentModel(provider)
-        return providerAliases.any { alias -> "$alias/$normalizedModel" in providerScopedModels }
+        val normalizedModelForProvider = normalizeAgentModelsJsonModelId(apiProvider, normalizedModel)
+        if (normalizedModel in selectedModelIds) return true
+        if (normalizedModelForProvider in selectedModelIds) return true
+
+        val providerAliases = if (normalizedProvider.isBlank()) {
+            allowedProviders
+        } else {
+            providerAliasesForAgentModel(provider)
+        }
+        return providerAliases.any { alias ->
+            "$alias/$normalizedModel" in providerScopedModels ||
+                "$alias/$normalizedModelForProvider" in providerScopedModels
+        }
     }
 
     private fun providerAliasesForAgentModel(provider: String): Set<String> {
@@ -2563,10 +2641,10 @@ class ProcessManager(
     }
 
     private fun modelsJsonProviderNamesFor(apiProvider: String): Set<String> {
-        return when (apiProvider.trim().lowercase()) {
-            "openai-codex" -> setOf("openai-codex", "codex")
+        return when (val provider = apiProvider.trim().lowercase()) {
+            "openai-codex" -> codexAgentProviderAliases()
             "ollama", "ollama-cloud" -> setOf("ollama")
-            else -> setOf(apiProvider.trim().lowercase())
+            else -> setOf(provider)
         }
     }
 
@@ -2575,6 +2653,10 @@ class ProcessManager(
         selectedModelIds: Set<String>,
     ): Set<String> {
         return when (apiProvider.trim().lowercase()) {
+            "openai-codex" -> selectedModelIds
+                .map { OpenClawCodexModelScope.bareModelId(it) }
+                .filter { it.isNotBlank() }
+                .toSet()
             "openai-compatible" -> selectedModelIds
                 .map { it.removePrefix("openai-compatible/") }
                 .filter { it.isNotBlank() }
@@ -2585,6 +2667,116 @@ class ProcessManager(
                 .toSet()
             else -> selectedModelIds
         }
+    }
+
+    private fun selectedAgentModelIds(
+        apiProvider: String,
+        selectedEntries: List<ModelSelectionEntry>,
+        providerScopedModels: Set<String>,
+    ): Set<String> {
+        return when (apiProvider.trim().lowercase()) {
+            "openai-codex" -> providerScopedModels
+                .map { OpenClawCodexModelScope.bareModelId(it) }
+                .filter { it.isNotBlank() && !it.contains("/") }
+                .toSet()
+            else -> selectedEntries
+                .map { it.id.trim() }
+                .filter { it.isNotBlank() }
+                .toSet()
+        }
+    }
+
+    private fun targetAgentModelProvider(
+        apiProvider: String,
+        installedOpenClawVersion: String?,
+    ): String {
+        return when (val provider = apiProvider.trim().lowercase()) {
+            "openai-codex" -> OpenClawCodexModelScope.providerForInstalledVersion(installedOpenClawVersion)
+            "ollama-cloud" -> "ollama"
+            else -> provider
+        }
+    }
+
+    private fun shouldRewriteAgentModelProvider(apiProvider: String): Boolean {
+        return apiProvider.trim().lowercase() == "openai-codex"
+    }
+
+    private fun normalizeAgentModelsJsonModelId(apiProvider: String, modelId: String): String {
+        return when (apiProvider.trim().lowercase()) {
+            "openai-codex" -> OpenClawCodexModelScope.bareModelId(modelId)
+            else -> modelId.trim()
+        }
+    }
+
+    private fun normalizeSelectedAgentSessionModelState(
+        apiProvider: String,
+        targetProvider: String,
+        entry: JSONObject,
+        providerKey: String,
+        modelKey: String,
+    ): Boolean {
+        if (!shouldRewriteAgentModelProvider(apiProvider)) return false
+        val currentProvider = entry.optString(providerKey).trim()
+        val currentModel = entry.optString(modelKey).trim()
+        if (!isCodexAgentModelReference(currentProvider, currentModel)) return false
+
+        var changed = false
+        if (currentProvider != targetProvider) {
+            entry.put(providerKey, targetProvider)
+            changed = true
+        }
+
+        val bareModel = OpenClawCodexModelScope.bareModelId(currentModel)
+        if (bareModel.isNotBlank() && bareModel != currentModel) {
+            entry.put(modelKey, bareModel)
+            changed = true
+        }
+        return changed
+    }
+
+    private fun isCodexAgentModelReference(provider: String, model: String): Boolean {
+        val normalizedProvider = provider.trim().lowercase()
+        val normalizedModel = model.trim().lowercase()
+        return normalizedProvider in codexAgentProviderAliases() ||
+            normalizedModel.startsWith("${OpenClawCodexModelScope.LEGACY_PROVIDER}/") ||
+            normalizedModel.startsWith("${OpenClawCodexModelScope.CODEX_PROVIDER}/")
+    }
+
+    private fun agentProviderNamesForApiProvider(apiProvider: String): Set<String> {
+        return when (val provider = apiProvider.trim().lowercase()) {
+            "openai-codex" -> codexAgentProviderAliases()
+            "ollama", "ollama-cloud" -> setOf("ollama", "ollama-cloud")
+            else -> setOf(provider)
+        }
+    }
+
+    private fun codexAgentProviderAliases(): Set<String> {
+        return setOf(OpenClawCodexModelScope.LEGACY_PROVIDER, OpenClawCodexModelScope.CODEX_PROVIDER)
+    }
+
+    private fun mergeAgentProviderModelsJson(
+        existing: JSONObject?,
+        incoming: JSONObject,
+    ): JSONObject {
+        val merged = if (existing != null) JSONObject(existing.toString()) else JSONObject(incoming.toString())
+        val mergedModels = JSONArray()
+        val seenIds = mutableSetOf<String>()
+
+        fun appendModels(models: JSONArray?) {
+            if (models == null) return
+            for (index in 0 until models.length()) {
+                val modelObject = models.optJSONObject(index) ?: continue
+                val modelId = modelObject.optString("id").trim()
+                if (modelId.isNotBlank() && seenIds.add(modelId)) {
+                    mergedModels.put(modelObject)
+                }
+            }
+        }
+
+        appendModels(existing?.optJSONArray("models"))
+        appendModels(incoming.optJSONArray("models"))
+        merged.put("models", mergedModels)
+        return merged
     }
 
     private fun buildModelEntryJson(entry: ModelSelectionEntry, api: String = "openai-completions"): JSONObject {
@@ -2662,12 +2854,9 @@ class ProcessManager(
         } ?: return
         // Keep only the 2 most recent, delete the rest
         if (pidDirs.size > 2) {
-            pidDirs.sortedBy { it.lastModified() }
-                .dropLast(2)
-                .forEach {
-                    it.deleteRecursively()
-                    addLog("[andClaw] Cleaned stale compile cache: ${it.name}")
-                }
+            val stale = pidDirs.sortedBy { it.lastModified() }.dropLast(2)
+            stale.forEach { it.deleteRecursively() }
+            addLog("[andClaw] Cleaned ${stale.size} stale compile cache dirs")
         }
     }
 
@@ -2681,6 +2870,8 @@ class ProcessManager(
             !patchFile.readText().contains("Module._resolveFilename") ||
             !patchFile.readText().contains("realpathSync.native") ||
             !patchFile.readText().contains("dns.setServers") ||
+            !patchFile.readText().contains("andclawRecordHttpMetric") ||
+            !patchFile.readText().contains("codex-http-metrics.jsonl") ||
             patchFile.readText().contains("scheduleCodexAppServerPrewarm") ||
             patchFile.readText().contains("OPENCLAW_PREWARM_CODEX_APP_SERVER") ||
             patchFile.readText().contains("openclaw-codex-prewarm") ||
@@ -2718,9 +2909,90 @@ class ProcessManager(
                 appendLine()
                 // Skip startup pricing fetches — they are optional metadata and can
                 // block gateway startup for the full 60s fetch timeout on mobile networks.
+                appendLine("const ANDCLAW_CODEX_HTTP_METRICS_PATH = '/root/.openclaw/agents/main/agent/codex-home/codex-http-metrics.jsonl';")
+                appendLine("function andclawHeaderPairs(headers) {")
+                appendLine("  var out = [];")
+                appendLine("  if (!headers) return out;")
+                appendLine("  try {")
+                appendLine("    if (typeof headers.forEach === 'function') {")
+                appendLine("      headers.forEach(function(value, name) { out.push([String(name), String(value)]); });")
+                appendLine("      return out;")
+                appendLine("    }")
+                appendLine("    if (Array.isArray(headers)) {")
+                appendLine("      headers.forEach(function(pair) {")
+                appendLine("        if (Array.isArray(pair) && pair.length >= 2) out.push([String(pair[0]), String(pair[1])]);")
+                appendLine("      });")
+                appendLine("      return out;")
+                appendLine("    }")
+                appendLine("    if (typeof headers === 'object') {")
+                appendLine("      Object.keys(headers).forEach(function(name) {")
+                appendLine("        var value = headers[name];")
+                appendLine("        if (Array.isArray(value)) value = value.join(',');")
+                appendLine("        out.push([String(name), String(value == null ? '' : value)]);")
+                appendLine("      });")
+                appendLine("    }")
+                appendLine("  } catch (_) {}")
+                appendLine("  return out;")
+                appendLine("}")
+                appendLine("function andclawHeaderStats(headers) {")
+                appendLine("  var headerBytes = 0;")
+                appendLine("  var cookieBytes = 0;")
+                appendLine("  var cookieCount = 0;")
+                appendLine("  var names = [];")
+                appendLine("  andclawHeaderPairs(headers).forEach(function(pair) {")
+                appendLine("    var name = String(pair[0] || '').toLowerCase();")
+                appendLine("    var value = String(pair[1] || '');")
+                appendLine("    if (name && names.indexOf(name) < 0) names.push(name);")
+                appendLine("    headerBytes += name.length + 2 + value.length + 2;")
+                appendLine("    if (name === 'cookie') {")
+                appendLine("      cookieBytes += value.length;")
+                appendLine("      cookieCount += value.split(';').filter(function(part) { return part.trim().length > 0; }).length;")
+                appendLine("    }")
+                appendLine("  });")
+                appendLine("  return {headerBytes:headerBytes,cookieBytes:cookieBytes,cookieCount:cookieCount,headerNames:names.sort()};")
+                appendLine("}")
+                appendLine("function andclawUrlInfo(raw) {")
+                appendLine("  try {")
+                appendLine("    if (raw && typeof raw === 'object' && raw.url) raw = raw.url;")
+                appendLine("    var parsed = new URL(String(raw || ''));")
+                appendLine("    return {host:parsed.hostname,path:parsed.pathname || ''};")
+                appendLine("  } catch (_) {")
+                appendLine("    return {host:'',path:''};")
+                appendLine("  }")
+                appendLine("}")
+                appendLine("function andclawRecordHttpMetric(kind, rawUrl, headers, status) {")
+                appendLine("  try {")
+                appendLine("    var fs0 = require('fs');")
+                appendLine("    var path0 = require('path');")
+                appendLine("    var info = andclawUrlInfo(rawUrl);")
+                appendLine("    var stats = andclawHeaderStats(headers);")
+                appendLine("    var row = {")
+                appendLine("      ts: Date.now(),")
+                appendLine("      kind: kind,")
+                appendLine("      host: info.host,")
+                appendLine("      path: info.path,")
+                appendLine("      status: status || 0,")
+                appendLine("      headerBytes: stats.headerBytes,")
+                appendLine("      cookieBytes: stats.cookieBytes,")
+                appendLine("      cookieCount: stats.cookieCount,")
+                appendLine("      headerNames: stats.headerNames")
+                appendLine("    };")
+                appendLine("    fs0.mkdirSync(path0.dirname(ANDCLAW_CODEX_HTTP_METRICS_PATH), {recursive:true});")
+                appendLine("    try { if (fs0.existsSync(ANDCLAW_CODEX_HTTP_METRICS_PATH) && fs0.statSync(ANDCLAW_CODEX_HTTP_METRICS_PATH).size > 1048576) fs0.unlinkSync(ANDCLAW_CODEX_HTTP_METRICS_PATH); } catch (_) {}")
+                appendLine("    fs0.appendFileSync(ANDCLAW_CODEX_HTTP_METRICS_PATH, JSON.stringify(row) + '\\n');")
+                appendLine("  } catch (_) {}")
+                appendLine("}")
+                appendLine("function andclawFetchHeaders(url, opts) {")
+                appendLine("  var pairs = [];")
+                appendLine("  try { if (url && url.headers) pairs = pairs.concat(andclawHeaderPairs(url.headers)); } catch (_) {}")
+                appendLine("  try { if (opts && opts.headers) pairs = pairs.concat(andclawHeaderPairs(opts.headers)); } catch (_) {}")
+                appendLine("  return pairs;")
+                appendLine("}")
                 appendLine("var _origFetch = globalThis.fetch;")
                 appendLine("globalThis.fetch = function(url, opts) {")
                 appendLine("  var fetchUrl = typeof url === 'string' ? url : (url && url.url ? String(url.url) : '');")
+                appendLine("  var fetchHeaders = andclawFetchHeaders(url, opts);")
+                appendLine("  andclawRecordHttpMetric('fetch', fetchUrl, fetchHeaders, 0);")
                 appendLine("  if (fetchUrl.includes('openrouter.ai/api/v1/models')) {")
                 appendLine("    return Promise.resolve(new Response(JSON.stringify({data:[]}),")
                 appendLine("      {status:200,headers:{'Content-Type':'application/json'}}));")
@@ -2729,8 +3001,49 @@ class ProcessManager(
                 appendLine("    return Promise.resolve(new Response(JSON.stringify({}),")
                 appendLine("      {status:200,headers:{'Content-Type':'application/json'}}));")
                 appendLine("  }")
-                appendLine("  return _origFetch.apply(this, arguments);")
+                appendLine("  return _origFetch.apply(this, arguments).then(function(resp) {")
+                appendLine("    try { andclawRecordHttpMetric('fetch', fetchUrl, fetchHeaders, resp && resp.status ? resp.status : 0); } catch (_) {}")
+                appendLine("    return resp;")
+                appendLine("  }, function(err) {")
+                appendLine("    try { andclawRecordHttpMetric('fetch', fetchUrl, fetchHeaders, -1); } catch (_) {}")
+                appendLine("    throw err;")
+                appendLine("  });")
                 appendLine("};")
+                appendLine("function andclawRequestInfo(args) {")
+                appendLine("  var rawUrl = '';")
+                appendLine("  var headers = [];")
+                appendLine("  try {")
+                appendLine("    var first = args[0];")
+                appendLine("    var second = args[1];")
+                appendLine("    if (typeof first === 'string' || first instanceof URL) { rawUrl = String(first); }")
+                appendLine("    if (first && typeof first === 'object' && !(first instanceof URL)) {")
+                appendLine("      var protocol = first.protocol || '';")
+                appendLine("      var host = first.hostname || first.host || '';")
+                appendLine("      var path = first.path || first.pathname || '';")
+                appendLine("      if (host) rawUrl = String(protocol || '') + '//' + String(host) + String(path || '');")
+                appendLine("      headers = headers.concat(andclawHeaderPairs(first.headers));")
+                appendLine("    }")
+                appendLine("    if (second && typeof second === 'object') { headers = headers.concat(andclawHeaderPairs(second.headers)); }")
+                appendLine("  } catch (_) {}")
+                appendLine("  return {url:rawUrl,headers:headers};")
+                appendLine("}")
+                appendLine("function andclawPatchRequestModule(mod, kind) {")
+                appendLine("  if (!mod || !mod.request || mod.request.__andclawPatched) return;")
+                appendLine("  var orig = mod.request;")
+                appendLine("  var patched = function() {")
+                appendLine("    var args = Array.prototype.slice.call(arguments);")
+                appendLine("    var info = andclawRequestInfo(args);")
+                appendLine("    andclawRecordHttpMetric(kind, info.url, info.headers, 0);")
+                appendLine("    var req = orig.apply(this, arguments);")
+                appendLine("    try { req.on('response', function(res) { andclawRecordHttpMetric(kind, info.url, info.headers, res && res.statusCode ? res.statusCode : 0); }); } catch (_) {}")
+                appendLine("    try { req.on('error', function() { andclawRecordHttpMetric(kind, info.url, info.headers, -1); }); } catch (_) {}")
+                appendLine("    return req;")
+                appendLine("  };")
+                appendLine("  patched.__andclawPatched = true;")
+                appendLine("  mod.request = patched;")
+                appendLine("}")
+                appendLine("try { andclawPatchRequestModule(require('https'), 'https'); } catch (_) {}")
+                appendLine("try { andclawPatchRequestModule(require('http'), 'http'); } catch (_) {}")
                 appendLine()
                 appendLine("const fs = require('fs');")
                 appendLine("const path = require('path');")
@@ -2888,11 +3201,32 @@ class ProcessManager(
     }
 
     private fun readInstalledOpenClawVersion(): String? {
-        val packageJson = File(prorootManager.rootfsDir, "usr/local/lib/node_modules/openclaw/package.json")
-        if (!packageJson.exists()) return null
-        return runCatching {
-            org.json.JSONObject(packageJson.readText()).optString("version").trim().ifBlank { null }
-        }.getOrNull()
+        return OpenClawCodexModelScope.readInstalledOpenClawVersion(prorootManager.rootfsDir)
+    }
+
+    private fun readInstalledCodexBareModelIds(installedOpenClawVersion: String?): Set<String> {
+        val providerScope = OpenClawCodexModelScope.providerForInstalledVersion(installedOpenClawVersion)
+        val directEntries = OpenClawModelCatalogReader.loadProviderModels(prorootManager.rootfsDir, providerScope)
+        val entries = if (directEntries.isNotEmpty()) {
+            directEntries
+        } else if (providerScope == OpenClawCodexModelScope.LEGACY_PROVIDER) {
+            OpenClawModelCatalogReader.loadProviderModels(prorootManager.rootfsDir, "openai")
+                .filter { entry -> isLegacyOpenAiCodexModelId(entry.id) }
+        } else {
+            emptyList()
+        }
+        return entries
+            .map { entry -> OpenClawCodexModelScope.bareModelId(entry.id) }
+            .filter { it.isNotBlank() && !it.contains("/") }
+            .toSet()
+    }
+
+    private fun isLegacyOpenAiCodexModelId(modelId: String): Boolean {
+        val normalizedModelId = OpenClawCodexModelScope.normalizedBareModelId(modelId)
+        return normalizedModelId.contains("codex") ||
+            normalizedModelId == "gpt-5.1" ||
+            normalizedModelId == "gpt-5.2" ||
+            normalizedModelId == "gpt-5.4"
     }
 
     private fun addLog(line: String) {
@@ -2953,8 +3287,12 @@ class ProcessManager(
             startPairingObserver()
         }
 
-        // Browser control 서버가 준비되면 startup 완전 완료
-        if (lineLower.contains("browser") && lineLower.contains("control listening") ||
+        val isGatewayReady = lineLower.contains("gateway ready") ||
+            lineLower.contains("[gateway] ready")
+
+        // OpenClaw가 startup sidecar 준비까지 끝냈다고 알리면 startup 완전 완료.
+        if (isGatewayReady ||
+            lineLower.contains("browser") && lineLower.contains("control listening") ||
             lineLower.contains("browser/server") && lineLower.contains("listening")) {
             clearStartupAttempt()
             _gatewayState.value = _gatewayState.value.copy(

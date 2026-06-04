@@ -47,8 +47,10 @@ import com.coderred.andclaw.data.hasOpenClawSecretRef
 import com.coderred.andclaw.proroot.BundleUpdateOutcome
 import com.coderred.andclaw.proroot.ExecutionRuntime
 import com.coderred.andclaw.proroot.GatewayWsClient
+import com.coderred.andclaw.proroot.OpenClawCodexModelScope
 import com.coderred.andclaw.proroot.OpenClawModelCatalogReader
 import com.coderred.andclaw.proroot.ProcessManager
+import com.coderred.andclaw.proroot.ProrootManager
 import com.coderred.andclaw.proroot.WhatsAppLoginCoordinator
 import com.coderred.andclaw.service.GatewayService
 import com.coderred.andclaw.ui.screen.dashboard.WhatsAppQrState
@@ -211,6 +213,360 @@ class SettingsViewModel(
         private const val OAUTH_REDIRECT_URI = "http://localhost:1455/auth/callback"
         private const val OAUTH_SCOPE = "openid profile email offline_access"
         private const val OAUTH_JWT_CLAIM_PATH = "https://api.openai.com/auth"
+        private const val CODEX_NATIVE_PROBE_TIMEOUT_MS = 45_000L
+        private val CODEX_NATIVE_PROBE_COMMAND = """
+            node --input-type=module <<'__ANDCLAW_CODEX_NATIVE_PROBE__'
+            import fs from 'node:fs';
+            import { spawn } from 'node:child_process';
+            import { createInterface } from 'node:readline';
+
+            const agentDir = '/root/.openclaw/agents/main/agent';
+            const authPath = agentDir + '/auth-profiles.json';
+            const probeHome = '/tmp/andclaw-codex-probe-home-' + process.pid;
+            const cookieDiagPath = probeHome + '/chatgpt-cf-cookie-diagnostics.jsonl';
+            const bin = process.env.OPENCLAW_CODEX_APP_SERVER_BIN || '/root/.openclaw/andclaw-bundled-plugins/npm/node_modules/@openclaw/codex/node_modules/@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl/bin/codex';
+            const uaSourceEnvKeys = [
+              'TERM_PROGRAM',
+              'TERM_PROGRAM_VERSION',
+              'WEZTERM_VERSION',
+              'ITERM_SESSION_ID',
+              'ITERM_PROFILE',
+              'ITERM_PROFILE_NAME',
+              'TERM_SESSION_ID',
+              'TERM',
+              'KITTY_WINDOW_ID',
+              'ALACRITTY_SOCKET',
+              'KONSOLE_VERSION',
+              'GNOME_TERMINAL_SCREEN',
+              'VTE_VERSION',
+              'WT_SESSION',
+              'TMUX',
+              'ZELLIJ',
+              'ZELLIJ_VERSION',
+              'COLORTERM',
+            ];
+
+            function readProfile() {
+              let root;
+              try {
+                root = JSON.parse(fs.readFileSync(authPath, 'utf8'));
+              } catch {
+                return null;
+              }
+              const profiles = root && root.profiles && typeof root.profiles === 'object' ? root.profiles : {};
+              const direct = profiles['openai-codex:default'];
+              if (direct && String(direct.provider || '').toLowerCase() === 'openai-codex') {
+                return { id: 'openai-codex:default', profile: direct };
+              }
+              for (const [id, profile] of Object.entries(profiles)) {
+                if (String(profile && profile.provider || '').toLowerCase() === 'openai-codex') {
+                  return { id, profile };
+                }
+              }
+              return null;
+            }
+
+            function sanitize(raw) {
+              return String(raw || '')
+                .replace(/Bearer\s+[A-Za-z0-9._-]+/ig, 'Bearer <redacted>')
+                .replace(/[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}/g, '<jwt>')
+                .replace(/(accessToken|refreshToken|idToken|apiKey|authorization|cookie|set-cookie)(["']?\s*[:=]\s*["']?)[^"'\s,;}]+/ig, (_match, key, sep) => key + sep + '<redacted>')
+                .trim();
+            }
+
+            function count(text, needle) {
+              let n = 0;
+              let i = String(text).toLowerCase().indexOf(needle);
+              while (i >= 0) {
+                n += 1;
+                i = String(text).toLowerCase().indexOf(needle, i + needle.length);
+              }
+              return n;
+            }
+
+            function hits(text) {
+              return 'hits=bad400:' + count(text, '400 bad request') +
+                ' header:' + count(text, 'request header') +
+                ' tooLarge:' + count(text, 'cookie too large') +
+                ' cloudflare:' + count(text, 'cloudflare');
+            }
+
+            function compactList(values, maxItems) {
+              const unique = Array.from(new Set(values.filter(Boolean)));
+              const head = unique.slice(0, maxItems);
+              return head.join('|') + (unique.length > head.length ? '|+' + (unique.length - head.length) : '');
+            }
+
+            function collectRawEnv(keys) {
+              const values = {};
+              for (const key of keys) {
+                if (Object.prototype.hasOwnProperty.call(process.env, key)) {
+                  values[key] = String(process.env[key] ?? '');
+                }
+              }
+              return values;
+            }
+
+            function checkpoint(label, extra) {
+              const suffix = extra ? ' ' + extra : '';
+              console.log('nativeProbeCheckpoint=' + label + suffix);
+            }
+
+            function redactRawDiagnosticEvent(event) {
+              if (!event || typeof event !== 'object') return event;
+              if (event.event === 'backend_headers' && Array.isArray(event.headers)) {
+                event.headers = event.headers.map((header) => {
+                  const next = { ...(header || {}) };
+                  const name = String(next.name || '').toLowerCase();
+                  if (name === 'authorization' || name === 'cookie' || name === 'set-cookie') {
+                    next.value = '<redacted>';
+                    next.valueRedacted = true;
+                  }
+                  return next;
+                });
+              }
+              return event;
+            }
+
+            function summarizeCookieDiagnostics() {
+              let rawText = '';
+              try {
+                rawText = fs.readFileSync(cookieDiagPath, 'utf8');
+              } catch {
+                return 'cfCookies=none';
+              }
+              const lines = rawText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+              const stats = {
+                events: 0,
+                set: 0,
+                send: 0,
+                maxRaw: 0,
+                maxRawCount: 0,
+                maxFiltered: 0,
+                maxFilteredCount: 0,
+                maxPair: 0,
+                hosts: [],
+                paths: [],
+                duplicates: [],
+                setCookies: [],
+                pairs: [],
+                explicit: 0,
+                explicitMaxTotal: 0,
+                explicitMaxValue: 0,
+                explicitHeaders: [],
+                patches: [],
+              };
+              const rawLines = [];
+              for (const line of lines) {
+                let event;
+                try { event = JSON.parse(line); } catch { continue; }
+                rawLines.push(JSON.stringify(redactRawDiagnosticEvent(event)));
+                stats.events += 1;
+                if (event.host) stats.hosts.push(event.host);
+                if (event.path) stats.paths.push(event.path);
+                if (event.patch) stats.patches.push(event.patch);
+                if (event.event === 'set_cookie') {
+                  stats.set += 1;
+                  for (const cookie of Array.isArray(event.cookies) ? event.cookies : []) {
+                    stats.setCookies.push(
+                      String(cookie.name || '?') +
+                        ':raw=' + Number(cookie.rawBytes || 0) +
+                        ':value=' + Number(cookie.valueBytes || 0) +
+                        ':path=' + String(cookie.path || '-') +
+                        ':domain=' + String(cookie.domain || '-')
+                    );
+                  }
+                } else if (event.event === 'send_cookie') {
+                  stats.send += 1;
+                  const raw = event.raw || {};
+                  const filtered = event.filtered || {};
+                  stats.maxRaw = Math.max(stats.maxRaw, Number(raw.bytes || 0));
+                  stats.maxRawCount = Math.max(stats.maxRawCount, Number(raw.count || 0));
+                  stats.maxFiltered = Math.max(stats.maxFiltered, Number(filtered.bytes || 0));
+                  stats.maxFilteredCount = Math.max(stats.maxFilteredCount, Number(filtered.count || 0));
+                  stats.maxPair = Math.max(stats.maxPair, Number(raw.maxPairBytes || 0), Number(filtered.maxPairBytes || 0));
+                  for (const dup of Array.isArray(raw.duplicateNames) ? raw.duplicateNames : []) {
+                    stats.duplicates.push(String(dup.name || '?') + 'x' + Number(dup.count || 0));
+                  }
+                  for (const pair of Array.isArray(raw.pairs) ? raw.pairs : []) {
+                    stats.pairs.push(String(pair.name || '?') + ':' + Number(pair.pairBytes || 0) + 'B');
+                  }
+                } else if (event.event === 'backend_headers') {
+                  stats.explicit += 1;
+                  stats.explicitMaxTotal = Math.max(stats.explicitMaxTotal, Number(event.totalBytes || 0));
+                  stats.explicitMaxValue = Math.max(stats.explicitMaxValue, Number(event.maxValueBytes || 0));
+                  for (const header of Array.isArray(event.headers) ? event.headers : []) {
+                    const headerName = String(header.name || '?').toLowerCase();
+                    const safeHeaderName = headerName === 'authorization' ? 'authz' :
+                      (headerName === 'chatgpt-account-id' ? 'chatgptAccountId' : headerName);
+                    stats.explicitHeaders.push(safeHeaderName + ':' + Number(header.valueBytes || 0) + 'B');
+                  }
+                }
+              }
+              return 'cfCookies=events=' + stats.events +
+                ' set=' + stats.set +
+                ' send=' + stats.send +
+                ' explicit=' + stats.explicit +
+                ' maxRaw=' + stats.maxRaw + 'B rawCount=' + stats.maxRawCount +
+                ' maxFiltered=' + stats.maxFiltered + 'B filteredCount=' + stats.maxFilteredCount +
+                ' maxPair=' + stats.maxPair + 'B' +
+                ' explicitTotal=' + stats.explicitMaxTotal + 'B explicitMax=' + stats.explicitMaxValue + 'B' +
+                ' dups=' + (compactList(stats.duplicates, 8) || 'none') +
+                ' explicitNames=' + (compactList(stats.explicitHeaders, 12) || 'none') +
+                ' setNames=' + (compactList(stats.setCookies, 8) || 'none') +
+                ' pairs=' + (compactList(stats.pairs, 12) || 'none') +
+                ' patches=' + (compactList(stats.patches, 4) || 'none') +
+                ' hosts=' + (compactList(stats.hosts, 8) || 'none') +
+                ' paths=' + (compactList(stats.paths, 8) || 'none') +
+                ' rawJsonl=' + JSON.stringify(rawLines.join('\n'));
+            }
+
+            const selected = readProfile();
+            if (!selected) {
+              console.log('nativeProbe=oauth:no');
+              process.exit(0);
+            }
+            checkpoint('profile-read');
+
+            const credential = selected.profile || {};
+            const access = String(credential.access || credential.token || '').trim();
+            const refresh = String(credential.refresh || '').trim();
+            const accountId = String(credential.accountId || credential.email || selected.id).trim();
+            const planType = String(credential.chatgptPlanType || credential.planType || '').trim();
+            const expires = Number(credential.expires || 0);
+            const expiresInSec = expires > 0 ? Math.round((expires - Date.now()) / 1000) : 0;
+            const parts = [
+              'oauth:yes',
+              'accessBytes=' + access.length,
+              'refreshBytes=' + refresh.length,
+              'account=' + (accountId ? 'yes' : 'no'),
+              'plan=' + (planType ? 'yes' : 'no'),
+              'expiresInSec=' + expiresInSec,
+              'uaSourceEnvRaw=' + JSON.stringify(collectRawEnv(uaSourceEnvKeys)),
+            ];
+
+            if (!access) {
+              console.log('nativeProbe=' + parts.concat(['access:no']).join(' '));
+              process.exit(0);
+            }
+            checkpoint('access-ready accessBytes=' + access.length);
+
+            try { fs.rmSync(probeHome, { recursive: true, force: true }); } catch {}
+            fs.mkdirSync(probeHome, { recursive: true });
+            checkpoint('probe-home-ready');
+
+            const child = spawn(bin, ['app-server', '--listen', 'stdio://'], {
+              env: {
+                ...process.env,
+                CODEX_HOME: probeHome,
+                CODEX_CHATGPT_CF_COOKIE_DIAGNOSTICS_PATH: cookieDiagPath,
+                HOME: '/root',
+                RUST_LOG: 'info',
+                UV_USE_IO_URING: '0',
+              },
+              stdio: ['pipe', 'pipe', 'pipe'],
+            });
+            checkpoint('spawned pid=' + child.pid);
+            child.stdin.setDefaultEncoding('utf8');
+
+            let nextId = 1;
+            let stderrRaw = '';
+            let stderrBytes = 0;
+            const pending = new Map();
+            const lines = createInterface({ input: child.stdout });
+
+            function rejectAll(message) {
+              for (const entry of pending.values()) {
+                clearTimeout(entry.timer);
+                entry.reject(new Error(message));
+              }
+              pending.clear();
+            }
+
+            child.stderr.on('data', (chunk) => {
+              const text = chunk.toString('utf8');
+              stderrBytes += text.length;
+              stderrRaw += text;
+            });
+            child.on('error', (error) => rejectAll('spawn error: ' + error.message));
+            child.on('exit', (code, signal) => rejectAll('app-server exited code=' + code + ' signal=' + signal));
+            lines.on('line', (line) => {
+              let msg;
+              try { msg = JSON.parse(line); } catch { return; }
+              if (!msg || typeof msg.id === 'undefined') return;
+              const entry = pending.get(msg.id);
+              if (!entry) return;
+              pending.delete(msg.id);
+              clearTimeout(entry.timer);
+              if (msg.error) {
+                const err = new Error(msg.error.message || JSON.stringify(msg.error));
+                err.rpcCode = msg.error.code;
+                entry.reject(err);
+              } else {
+                entry.resolve(msg.result);
+              }
+            });
+
+            function request(method, params, timeoutMs) {
+              const id = nextId++;
+              return new Promise((resolve, reject) => {
+                const timer = setTimeout(() => {
+                  pending.delete(id);
+                  reject(new Error(method + ' timed out'));
+                }, timeoutMs);
+                pending.set(id, { resolve, reject, timer });
+                child.stdin.write(JSON.stringify({ id, method, params }) + '\n');
+              });
+            }
+
+            function summarizeAccount(result) {
+              const account = result && result.account && typeof result.account === 'object' ? result.account : null;
+              if (!account) return 'account:no';
+              const mode = sanitize(account.authMode || account.auth_mode || '');
+              const plan = sanitize(account.planType || account.plan_type || '');
+              return 'account:yes' + (mode ? ':mode=' + mode : '') + (plan ? ':plan=' + plan : '');
+            }
+
+            async function checked(label, method, params, timeoutMs, summarize) {
+              checkpoint(label + ':request method=' + method);
+              try {
+                const result = await request(method, params, timeoutMs);
+                parts.push(summarize ? summarize(result) : label + ':ok');
+                checkpoint(label + ':ok');
+              } catch (error) {
+                const code = typeof error.rpcCode === 'undefined' ? '' : ':code=' + error.rpcCode;
+                parts.push(label + ':err' + code + ':msgRaw=' + JSON.stringify(sanitize(error.message)));
+                checkpoint(label + ':err' + code + ':msgRaw=' + JSON.stringify(sanitize(error.message)));
+              }
+            }
+
+            try {
+              await checked('init', 'initialize', {
+                clientInfo: { name: 'andclaw-probe', title: 'andClaw Probe', version: '0' },
+                capabilities: { experimentalApi: true },
+              }, 10000);
+              await checked('login', 'account/login/start', {
+                type: 'chatgptAuthTokens',
+                accessToken: access,
+                chatgptAccountId: accountId || selected.id,
+                chatgptPlanType: planType || null,
+              }, 15000);
+              await checked('account', 'account/read', { refreshToken: false }, 15000, summarizeAccount);
+              await checked('rateLimits', 'account/rateLimits/read', {}, 15000, (result) => 'rateLimits:ok:bytes=' + JSON.stringify(result || {}).length);
+            } finally {
+              try { child.stdin.end(); } catch {}
+              try { child.kill('SIGTERM'); } catch {}
+            }
+
+            parts.push(summarizeCookieDiagnostics());
+            const combined = parts.join(' ') + ' ' + stderrRaw;
+            parts.push(hits(combined));
+            parts.push('stderrBytes=' + stderrBytes);
+            if (stderrRaw.trim()) parts.push('stderrRaw=' + JSON.stringify(sanitize(stderrRaw)));
+            console.log('nativeProbe=' + parts.join(' '));
+            try { fs.rmSync(probeHome, { recursive: true, force: true }); } catch {}
+            __ANDCLAW_CODEX_NATIVE_PROBE__
+        """.trimIndent()
         private const val LOG_UNLOCK_TAP_COUNT = 7
         private const val LOG_UNLOCK_TAP_WINDOW_MS = 2000L
         private const val WHATSAPP_QR_EXPIRES_MS = 120_000L
@@ -353,6 +709,12 @@ class SettingsViewModel(
     private val _isCodexAuthInProgress = MutableStateFlow(false)
     val isCodexAuthInProgress: StateFlow<Boolean> = _isCodexAuthInProgress.asStateFlow()
 
+    private val _isCodexAuthResetInProgress = MutableStateFlow(false)
+    val isCodexAuthResetInProgress: StateFlow<Boolean> = _isCodexAuthResetInProgress.asStateFlow()
+
+    private val _isCodexAuthDiagnosticsInProgress = MutableStateFlow(false)
+    val isCodexAuthDiagnosticsInProgress: StateFlow<Boolean> = _isCodexAuthDiagnosticsInProgress.asStateFlow()
+
     private val _isCodexAuthenticated = MutableStateFlow(false)
     val isCodexAuthenticated: StateFlow<Boolean> = _isCodexAuthenticated.asStateFlow()
 
@@ -416,6 +778,8 @@ class SettingsViewModel(
     private val openClawConfigEditorActionToken = AtomicLong(0L)
     private val openClawConfigEditorDraftVersion = AtomicLong(0L)
     private val codexAuthRunning = AtomicBoolean(false)
+    private val codexAuthResetRunning = AtomicBoolean(false)
+    private val codexAuthDiagnosticsRunning = AtomicBoolean(false)
     private val gitHubCopilotAuthRunning = AtomicBoolean(false)
     private var gitHubCopilotAuthJob: Job? = null
     private val oauthServerLock = Any()
@@ -1095,7 +1459,9 @@ class SettingsViewModel(
                     normalizeCodexModelIdForComparison(it.id)
                 }
                 val targetPrimary = savedPrimary
-                    ?: resolvePreferredCodexPrimaryModelFromInstalledBundle(installedCodexModels).removePrefix("openai-codex/")
+                    ?: OpenClawCodexModelScope.bareModelId(
+                        resolvePreferredCodexPrimaryModelFromInstalledBundle(installedCodexModels),
+                    )
                 val selectedModelIds = currentSelectedModelIds
                     .ifEmpty { listOf(targetPrimary) }
                     .let { modelIds ->
@@ -1149,9 +1515,7 @@ class SettingsViewModel(
     }
 
     private fun normalizeCodexModelIdForComparison(modelId: String): String {
-        return modelId.trim()
-            .removePrefix("openai-codex/")
-            .removePrefix("openai/")
+        return OpenClawCodexModelScope.bareModelId(modelId)
     }
 
     private fun persistLaunchConfigIfRunnable(
@@ -1882,6 +2246,8 @@ class SettingsViewModel(
             _isRecoveryInstallRunning.value ||
             _isOpenClawUpdateRunning.value ||
             _isCodexAuthInProgress.value ||
+            _isCodexAuthResetInProgress.value ||
+            _isCodexAuthDiagnosticsInProgress.value ||
             _isGitHubCopilotAuthInProgress.value
     }
 
@@ -2420,22 +2786,12 @@ class SettingsViewModel(
     private fun loadBuiltInModels(provider: String): List<OpenRouterModel> {
         val fallbackModels = defaultBuiltInModels(provider)
         val rootfsDir = prorootManager.rootfsDir
-        val builtInModels = OpenClawModelCatalogReader.loadProviderModels(rootfsDir, provider)
-            .ifEmpty {
-                if (provider == "openai-codex") {
-                    val legacyCodexEntries = resolveLegacyOpenAiCodexEntries(rootfsDir)
-                    val syntheticCodexEntries = OpenClawModelCatalogReader.loadSyntheticFallbackEntries(
-                        rootfsDir = rootfsDir,
-                        provider = "openai-codex",
-                        baseEntries = legacyCodexEntries,
-                    )
-                    (legacyCodexEntries + syntheticCodexEntries)
-                        .distinctBy { it.id }
-                } else {
-                    emptyList()
-                }
-            }
-            .map { it.toOpenRouterModel() }
+        val builtInModels = if (provider == "openai-codex") {
+            resolveCodexModelsFromInstalledBundle()
+        } else {
+            OpenClawModelCatalogReader.loadProviderModels(rootfsDir, provider)
+                .map { it.toOpenRouterModel() }
+        }
 
         return (if (builtInModels.isNotEmpty()) builtInModels else fallbackModels)
             .distinctBy { it.id }
@@ -2443,10 +2799,13 @@ class SettingsViewModel(
 
     private fun resolveCodexModelsFromInstalledBundle(): List<OpenRouterModel> {
         val rootfsDir = runCatching { prorootManager.rootfsDir }.getOrNull() ?: return emptyList()
+        val installedOpenClawVersion = OpenClawCodexModelScope.readInstalledOpenClawVersion(rootfsDir)
+        val providerScope = OpenClawCodexModelScope.providerForInstalledVersion(installedOpenClawVersion)
 
-        val directCodexModels = OpenClawModelCatalogReader.loadProviderModels(rootfsDir, "openai-codex")
+        val directCodexModels = OpenClawModelCatalogReader.loadProviderModels(rootfsDir, providerScope)
             .map { it.toOpenRouterModel() }
         if (directCodexModels.isNotEmpty()) return directCodexModels.distinctBy { it.id }
+        if (providerScope == OpenClawCodexModelScope.CODEX_PROVIDER) return emptyList()
 
         val legacyCodexEntries = resolveLegacyOpenAiCodexEntries(rootfsDir)
         val syntheticCodexEntries = OpenClawModelCatalogReader.loadSyntheticFallbackEntries(
@@ -2462,13 +2821,19 @@ class SettingsViewModel(
     private fun resolvePreferredCodexPrimaryModelFromInstalledBundle(
         preloaded: List<OpenRouterModel>? = null,
     ): String {
+        val installedOpenClawVersion = OpenClawCodexModelScope.readInstalledOpenClawVersion(
+            runCatching { prorootManager.rootfsDir }.getOrNull(),
+        )
+        val providerScope = OpenClawCodexModelScope.providerForInstalledVersion(installedOpenClawVersion)
         val availableIds = (preloaded ?: resolveCodexModelsFromInstalledBundle()).map { it.id }
-        return when {
-            "gpt-5.4" in availableIds -> "openai-codex/gpt-5.4"
-            "gpt-5.3-codex" in availableIds -> "openai-codex/gpt-5.3-codex"
-            availableIds.isNotEmpty() -> "openai-codex/${availableIds.first()}"
-            else -> "openai-codex/gpt-5.3-codex"
+        val preferredBareId = when {
+            providerScope == OpenClawCodexModelScope.CODEX_PROVIDER && "gpt-5.5" in availableIds -> "gpt-5.5"
+            "gpt-5.4" in availableIds -> "gpt-5.4"
+            "gpt-5.3-codex" in availableIds -> "gpt-5.3-codex"
+            availableIds.isNotEmpty() -> availableIds.first()
+            else -> OpenClawCodexModelScope.defaultBareModelId(installedOpenClawVersion)
         }
+        return OpenClawCodexModelScope.scopedModelIdForProvider(providerScope, preferredBareId)
     }
 
 
@@ -2622,6 +2987,7 @@ class SettingsViewModel(
     }
 
     fun loginOpenAiCodexOAuth() {
+        if (_isCodexAuthResetInProgress.value) return
         if (!codexAuthRunning.compareAndSet(false, true)) return
 
         viewModelScope.launch(Dispatchers.IO) {
@@ -2642,6 +3008,134 @@ class SettingsViewModel(
                 codexAuthRunning.set(false)
             }
         }
+    }
+
+    fun resetOpenAiCodexOAuth() {
+        if (_isCodexAuthInProgress.value) return
+        if (_isCodexAuthDiagnosticsInProgress.value) return
+        if (!codexAuthResetRunning.compareAndSet(false, true)) return
+
+        viewModelScope.launch(ioDispatcher) {
+            _isCodexAuthResetInProgress.value = true
+            try {
+                _codexAuthUrl.value = null
+                val result = CodexAuthResetter.reset(prorootManager.rootfsDir)
+                val status = if (result.changed) {
+                    appString(R.string.settings_codex_oauth_reset_success)
+                } else {
+                    appString(R.string.settings_codex_oauth_reset_noop)
+                }
+                _codexAuthDebugLine.value = "$status\n${result.diagnosticSummary()}"
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Log.e(TAG, "Codex OAuth reset failed: ${e.message}", e)
+                _codexAuthDebugLine.value = appString(
+                    R.string.settings_codex_oauth_reset_failed,
+                    e.message ?: e.javaClass.simpleName,
+                )
+            } finally {
+                _isCodexAuthenticated.value = detectCodexAuth()
+                _isCodexAuthResetInProgress.value = false
+                codexAuthResetRunning.set(false)
+            }
+        }
+    }
+
+    fun diagnoseOpenAiCodexOAuth() {
+        if (_isCodexAuthInProgress.value || _isCodexAuthResetInProgress.value) return
+        if (!codexAuthDiagnosticsRunning.compareAndSet(false, true)) return
+
+        viewModelScope.launch(ioDispatcher) {
+            _isCodexAuthDiagnosticsInProgress.value = true
+            try {
+                val diagnostic = CodexAuthResetter.diagnose(prorootManager.rootfsDir)
+                val nativeProbe = runCodexNativeAppServerProbe()
+                val summary = buildString {
+                    append(diagnostic.summary("current"))
+                    if (nativeProbe.isNotBlank()) {
+                        append('\n')
+                        append(nativeProbe)
+                    }
+                }
+                _codexAuthDebugLine.value = appString(
+                    R.string.settings_codex_oauth_diagnostics_result,
+                    summary,
+                )
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                Log.e(TAG, "Codex OAuth diagnostics failed: ${e.message}", e)
+                _codexAuthDebugLine.value = appString(
+                    R.string.settings_codex_oauth_diagnostics_failed,
+                    e.message ?: e.javaClass.simpleName,
+                )
+            } finally {
+                _isCodexAuthDiagnosticsInProgress.value = false
+                codexAuthDiagnosticsRunning.set(false)
+            }
+        }
+    }
+
+    private fun runCodexNativeAppServerProbe(): String {
+        val osReleaseRepair = runCatching { prorootManager.repairRootfsOsReleaseFiles() }.getOrNull()
+        val codexBin = runCatching { prorootManager.codexAppServerBin }
+            .getOrNull()
+            .orEmpty()
+            .ifBlank { ProrootManager.OPENCLAW_CODEX_APP_SERVER_BIN_FALLBACK }
+        val codexPathDir = runCatching { prorootManager.codexAppServerPathDir }
+            .getOrNull()
+            .orEmpty()
+            .ifBlank { ProrootManager.OPENCLAW_CODEX_APP_SERVER_PATH_DIR_FALLBACK }
+        val result = prorootManager.executeWithResult(
+            command = CODEX_NATIVE_PROBE_COMMAND,
+            timeoutMs = CODEX_NATIVE_PROBE_TIMEOUT_MS,
+            extraEnv = mapOf(
+                "HOME" to "/root",
+                "PATH" to "$codexPathDir:/usr/local/bin:/usr/bin:/bin",
+                "LANG" to "C.UTF-8",
+                "UV_USE_IO_URING" to "0",
+                "RUST_LOG" to "info",
+                "OPENCLAW_CODEX_APP_SERVER_BIN" to codexBin,
+            ),
+            returnFailureDiagnostics = true,
+            captureViaTempFile = true,
+        ) ?: return "nativeProbe=unavailable"
+
+        val repairSummary = osReleaseRepair?.diagnosticSummary().orEmpty()
+        val output = sanitizeCodexNativeProbeOutput(result.output)
+        return when {
+            result.timedOut -> appendCodexProbeRepairSummary("nativeProbe=timeout out=$output", repairSummary)
+            result.exitCode != 0 -> appendCodexProbeRepairSummary("nativeProbe=exit${result.exitCode} out=$output", repairSummary)
+            output.startsWith("nativeProbe=") -> appendCodexProbeRepairSummary(output, repairSummary)
+            output.isNotBlank() -> appendCodexProbeRepairSummary("nativeProbe=ok out=$output", repairSummary)
+            else -> appendCodexProbeRepairSummary("nativeProbe=no-output", repairSummary)
+        }
+    }
+
+    private fun appendCodexProbeRepairSummary(
+        probe: String,
+        repairSummary: String,
+    ): String {
+        if (repairSummary.isBlank()) return probe
+        return "$probe $repairSummary"
+    }
+
+    private fun sanitizeCodexNativeProbeOutput(raw: String): String {
+        val selectedLine = raw
+            .lineSequence()
+            .map { it.trim() }
+            .lastOrNull { it.contains("nativeProbe=") }
+        val selected = selectedLine ?: raw
+        return sanitizeCodexNativeProbeSecretText(selected)
+            .trim()
+    }
+
+    private fun sanitizeCodexNativeProbeSecretText(raw: String): String {
+        return raw
+            .replace(Regex("(?i)Bearer\\s+[A-Za-z0-9._-]+"), "Bearer <redacted>")
+            .replace(Regex("[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}"), "<jwt>")
+            .replace(
+                Regex("(?i)(accessToken|refreshToken|idToken|apiKey|authorization|cookie|set-cookie)([\"']?\\s*[:=]\\s*[\"']?)[^\"'\\s,;}]+"),
+            ) { match -> "${match.groupValues[1]}${match.groupValues[2]}<redacted>" }
     }
 
     private data class AuthorizationFlow(
@@ -3402,35 +3896,42 @@ class SettingsViewModel(
         if (!configFile.exists()) return
 
         runCatching {
+            val installedOpenClawVersion = OpenClawCodexModelScope.readInstalledOpenClawVersion(prorootManager.rootfsDir)
+            val providerScope = OpenClawCodexModelScope.providerForInstalledVersion(installedOpenClawVersion)
             val availableCodexModels = resolveCodexModelsFromInstalledBundle()
-            val availableCodexIds = availableCodexModels.map { it.id }
             val availableCodexModelsByNormalizedId = availableCodexModels.associateBy {
                 normalizeCodexModelIdForComparison(it.id)
             }
-            val availableScopedCodexIds = availableCodexIds.map { "openai-codex/$it" }.toSet()
-            val availableLegacyScopedCodexIds = availableCodexIds.map { "openai/$it" }.toSet()
             val preferredPrimary = resolvePreferredCodexPrimaryModelFromInstalledBundle(availableCodexModels)
             val json = JSONObject(configFile.readText())
             val agents = json.optJSONObject("agents") ?: JSONObject().also { json.put("agents", it) }
             val defaults = agents.optJSONObject("defaults") ?: JSONObject().also { agents.put("defaults", it) }
             val model = defaults.optJSONObject("model") ?: JSONObject().also { defaults.put("model", it) }
             val currentPrimary = model.optString("primary").trim()
-            val normalizedCurrentPrimary = when {
-                currentPrimary in availableScopedCodexIds -> currentPrimary
-                currentPrimary in availableLegacyScopedCodexIds -> "openai-codex/${normalizeCodexModelIdForComparison(currentPrimary)}"
-                currentPrimary in availableCodexIds -> "openai-codex/$currentPrimary"
-                else -> ""
+            val currentBarePrimary = OpenClawCodexModelScope.bareModelId(currentPrimary)
+            val normalizedCurrentPrimary = if (
+                currentBarePrimary.isNotBlank() &&
+                availableCodexModelsByNormalizedId.containsKey(normalizeCodexModelIdForComparison(currentBarePrimary))
+            ) {
+                OpenClawCodexModelScope.scopedModelIdForProvider(providerScope, currentBarePrimary)
+            } else {
+                ""
             }
             val primaryToPersist = normalizedCurrentPrimary.ifBlank { preferredPrimary }
             model.put("primary", primaryToPersist)
 
             val models = defaults.optJSONObject("models") ?: JSONObject().also { defaults.put("models", it) }
             if (!models.has(primaryToPersist)) {
-                val migratedLegacyModelConfig = if (currentPrimary in availableLegacyScopedCodexIds) {
-                    models.optJSONObject(currentPrimary)?.let { JSONObject(it.toString()) }
-                } else {
-                    null
+                val migratedLegacyModelConfig = buildList {
+                    add(currentPrimary)
+                    add("openai-codex/$currentBarePrimary")
+                    add("codex/$currentBarePrimary")
+                    add("openai/$currentBarePrimary")
                 }
+                    .distinct()
+                    .asSequence()
+                    .mapNotNull { models.optJSONObject(it)?.let { modelConfig -> JSONObject(modelConfig.toString()) } }
+                    .firstOrNull()
                 models.put(primaryToPersist, migratedLegacyModelConfig ?: JSONObject())
             }
             configFile.writeText(json.toString(2))

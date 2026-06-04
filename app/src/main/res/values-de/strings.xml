@@ -240,6 +240,22 @@ Fehlgeschlagen: %2$d</string>
     <string name="pairing_notification_text">%1$s: %2$s</string>
     <string name="settings_codex_oauth_title">Bei Codex anmelden</string>
     <string name="settings_codex_oauth_signing_in">Anmeldung läuft…</string>
+    <string name="settings_codex_oauth_reset_title">Codex-Anmeldung zurücksetzen</string>
+    <string name="settings_codex_oauth_reset_desc">Gespeicherten Codex-Status löschen</string>
+    <string name="settings_codex_oauth_reset_confirm_message">Gespeicherter Codex-Anmeldestatus wird gelöscht, damit eine erneute Anmeldung möglich ist. Andere Anbieter bleiben unverändert.</string>
+    <string name="settings_codex_oauth_reset_action">Zurücksetzen</string>
+    <string name="settings_codex_oauth_reset_running">Wird zurückgesetzt…</string>
+    <string name="settings_codex_oauth_reset_success">Codex-Anmeldung zurückgesetzt. Melden Sie sich erneut an, um fortzufahren.</string>
+    <string name="settings_codex_oauth_reset_noop">Keine gespeicherte Codex-Anmeldung gefunden.</string>
+    <string name="settings_codex_oauth_reset_failed">Zurücksetzen der Codex-Anmeldung fehlgeschlagen: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_title">Codex-Diagnose</string>
+    <string name="settings_codex_oauth_diagnostics_desc">Gespeicherten Status prüfen</string>
+    <string name="settings_codex_oauth_diagnostics_running">Wird geprüft…</string>
+    <string name="settings_codex_oauth_diagnostics_result">Codex-Diagnose\n%1$s</string>
+    <string name="settings_codex_oauth_diagnostics_failed">Codex-Diagnose fehlgeschlagen: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_view_full">Vollständige Diagnose anzeigen</string>
+    <string name="settings_codex_oauth_diagnostics_copy">Kopieren</string>
+    <string name="settings_codex_oauth_diagnostics_copied">Codex-Diagnose kopiert.</string>
     <string name="settings_github_copilot_login_title">Bei GitHub anmelden</string>
     <string name="settings_github_copilot_login_signing_in">Warte auf Anmeldung…</string>
     <string name="settings_github_copilot_login_code">Code: %1$s</string>
@@ -351,7 +367,3 @@ Schließen Sie die App nicht und erzwingen Sie keinen Stopp, solange die Wiederh
     <string name="settings_transfer_export_success">Transferexport abgeschlossen.</string>
     <string name="settings_transfer_share_failed">Die Transferdatei konnte nicht geteilt werden.</string>
 </resources>
-
-
-
-

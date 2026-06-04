@@ -4,6 +4,8 @@ import android.content.Context
 import android.util.Log
 import com.coderred.andclaw.data.PreferencesManager
 import java.io.File
+import java.io.IOException
+import java.nio.file.Files
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.flow.first
@@ -29,6 +31,31 @@ class ProrootManager(
         val timedOut: Boolean = false,
     )
 
+    data class OsReleaseRepairResult(
+        val changed: Boolean,
+        val etcOsReleaseBytesBefore: Long?,
+        val usrLibOsReleaseBytesBefore: Long?,
+        val lsbReleaseBytesBefore: Long?,
+        val alpineReleaseBytesBefore: Long?,
+        val etcOsReleaseBytesAfter: Long,
+        val usrLibOsReleaseBytesAfter: Long,
+        val lsbReleaseBytesAfter: Long,
+        val alpineReleaseExistsAfter: Boolean,
+    ) {
+        fun diagnosticSummary(): String {
+            fun bytes(value: Long?): String = value?.let { "${it}B" } ?: "missing"
+            return "osReleaseFix=${if (changed) "changed" else "ok"} " +
+                "etcBefore=${bytes(etcOsReleaseBytesBefore)} " +
+                "usrBefore=${bytes(usrLibOsReleaseBytesBefore)} " +
+                "lsbBefore=${bytes(lsbReleaseBytesBefore)} " +
+                "alpineBefore=${bytes(alpineReleaseBytesBefore)} " +
+                "etcAfter=${etcOsReleaseBytesAfter}B " +
+                "usrAfter=${usrLibOsReleaseBytesAfter}B " +
+                "lsbAfter=${lsbReleaseBytesAfter}B " +
+                "alpineAfter=${if (alpineReleaseExistsAfter) "present" else "missing"}"
+        }
+    }
+
     companion object {
         // Ubuntu 24.04 LTS arm64 base rootfs (bundled in assets)
         const val ROOTFS_ASSET = "rootfs.tar.gz.bin"
@@ -45,8 +72,10 @@ class ProrootManager(
         private const val PLAYWRIGHT_CHROME_MARKER = ".playwright_chrome_path"
         const val OPENCLAW_NODE_BIN = "/usr/local/bin/node"
         const val OPENCLAW_ENTRYPOINT = "/usr/local/lib/node_modules/openclaw/openclaw.mjs"
-        const val OPENCLAW_CODEX_APP_SERVER_BIN = "/root/.openclaw/andclaw-bundled-plugins/npm/node_modules/@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl/codex/codex"
-        const val OPENCLAW_CODEX_APP_SERVER_PATH_DIR = "/root/.openclaw/andclaw-bundled-plugins/npm/node_modules/@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl/path"
+        private const val CODEX_PLUGINS_BASE = "/root/.openclaw/andclaw-bundled-plugins/npm/node_modules"
+        private const val CODEX_VENDOR_SUFFIX = "@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl"
+        const val OPENCLAW_CODEX_APP_SERVER_BIN_FALLBACK = "$CODEX_PLUGINS_BASE/$CODEX_VENDOR_SUFFIX/codex/codex"
+        const val OPENCLAW_CODEX_APP_SERVER_PATH_DIR_FALLBACK = "$CODEX_PLUGINS_BASE/$CODEX_VENDOR_SUFFIX/path"
         const val GUEST_HOOK_LIB_PATH = "/root/.proroot/libproroot-runtime.so"
 
         const val GUEST_VFORK_SHIM_PATH = "/root/.proroot/libvfork_shim.so"
@@ -55,6 +84,29 @@ class ProrootManager(
         const val PROROOT_RUNTIME_LIB = "libproroot-runtime.so"
         const val PROROOT_BRIDGE_LIB = "libproroot-bridge.so"
         const val PROROOT_LINKER_LIB = "libproroot-linker.so"
+
+        internal val BUNDLED_ROOTFS_OS_RELEASE = """
+            PRETTY_NAME="Ubuntu 24.04.3 LTS"
+            NAME="Ubuntu"
+            VERSION_ID="24.04"
+            VERSION="24.04.3 LTS (Noble Numbat)"
+            VERSION_CODENAME=noble
+            ID=ubuntu
+            ID_LIKE=debian
+            HOME_URL="https://www.ubuntu.com/"
+            SUPPORT_URL="https://help.ubuntu.com/"
+            BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+            PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+            UBUNTU_CODENAME=noble
+            LOGO=ubuntu-logo
+        """.trimIndent() + "\n"
+
+        internal val BUNDLED_ROOTFS_LSB_RELEASE = """
+            DISTRIB_ID=Ubuntu
+            DISTRIB_RELEASE=24.04
+            DISTRIB_CODENAME=noble
+            DISTRIB_DESCRIPTION="Ubuntu 24.04.3 LTS"
+        """.trimIndent() + "\n"
     }
 
     // ── 경로 ──
@@ -98,6 +150,31 @@ class ProrootManager(
 
     val guestVforkShimHostPath: File
         get() = File(rootfsDir, "root/.proroot/libvfork_shim.so")
+
+    private data class CodexPaths(val bin: String, val pathDir: String)
+
+    private fun resolveCodexPaths(): CodexPaths {
+        val base = "root/.openclaw/andclaw-bundled-plugins/npm/node_modules"
+        val vendor = "@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl"
+        val candidates = listOf(
+            CodexPaths("$CODEX_PLUGINS_BASE/@openclaw/codex/node_modules/$vendor/bin/codex",
+                       "$CODEX_PLUGINS_BASE/@openclaw/codex/node_modules/$vendor/codex-path"),
+            CodexPaths("$CODEX_PLUGINS_BASE/$vendor/bin/codex",
+                       "$CODEX_PLUGINS_BASE/$vendor/codex-path"),
+            CodexPaths("$CODEX_PLUGINS_BASE/@openclaw/codex/node_modules/$vendor/codex/codex",
+                       "$CODEX_PLUGINS_BASE/@openclaw/codex/node_modules/$vendor/path"),
+            CodexPaths(OPENCLAW_CODEX_APP_SERVER_BIN_FALLBACK,
+                       OPENCLAW_CODEX_APP_SERVER_PATH_DIR_FALLBACK),
+        )
+        for (c in candidates) {
+            val hostBin = File(rootfsDir, c.bin.removePrefix("/"))
+            if (hostBin.exists()) return c
+        }
+        return candidates.first()
+    }
+
+    val codexAppServerBin: String get() = resolveCodexPaths().bin
+    val codexAppServerPathDir: String get() = resolveCodexPaths().pathDir
 
     /** 실행용 바이너리 디렉토리 (legacy proot용) */
     private val binDir: File
@@ -388,8 +465,69 @@ class ProrootManager(
         prepareRuntime(selectedRuntime)
     }
 
+    fun repairRootfsOsReleaseFiles(): OsReleaseRepairResult {
+        val etcDir = File(rootfsDir, "etc").apply { mkdirs() }
+        val usrLibDir = File(rootfsDir, "usr/lib").apply { mkdirs() }
+        val etcOsRelease = File(etcDir, "os-release")
+        val usrLibOsRelease = File(usrLibDir, "os-release")
+        val lsbRelease = File(etcDir, "lsb-release")
+        val alpineRelease = File(etcDir, "alpine-release")
+
+        val etcBefore = etcOsRelease.readTextOrNull()
+        val usrBefore = usrLibOsRelease.readTextOrNull()
+        val lsbBefore = lsbRelease.readTextOrNull()
+        val alpineBytesBefore = alpineRelease.sizeOrNull()
+        val alpineExistedBefore = alpineRelease.exists() || Files.isSymbolicLink(alpineRelease.toPath())
+        val changed = etcBefore != BUNDLED_ROOTFS_OS_RELEASE ||
+            usrBefore != BUNDLED_ROOTFS_OS_RELEASE ||
+            lsbBefore != BUNDLED_ROOTFS_LSB_RELEASE ||
+            alpineExistedBefore
+
+        usrLibOsRelease.writePlainTextFile(BUNDLED_ROOTFS_OS_RELEASE)
+        etcOsRelease.writePlainTextFile(BUNDLED_ROOTFS_OS_RELEASE)
+        lsbRelease.writePlainTextFile(BUNDLED_ROOTFS_LSB_RELEASE)
+
+        if (alpineExistedBefore && !alpineRelease.delete() && (alpineRelease.exists() || Files.isSymbolicLink(alpineRelease.toPath()))) {
+            throw IOException("Cannot remove stale Alpine release file: ${alpineRelease.absolutePath}")
+        }
+
+        return OsReleaseRepairResult(
+            changed = changed,
+            etcOsReleaseBytesBefore = etcBefore?.toByteArray()?.size?.toLong(),
+            usrLibOsReleaseBytesBefore = usrBefore?.toByteArray()?.size?.toLong(),
+            lsbReleaseBytesBefore = lsbBefore?.toByteArray()?.size?.toLong(),
+            alpineReleaseBytesBefore = alpineBytesBefore,
+            etcOsReleaseBytesAfter = etcOsRelease.length(),
+            usrLibOsReleaseBytesAfter = usrLibOsRelease.length(),
+            lsbReleaseBytesAfter = lsbRelease.length(),
+            alpineReleaseExistsAfter = alpineRelease.exists() || Files.isSymbolicLink(alpineRelease.toPath()),
+        )
+    }
+
     fun ldLibraryPath(): String {
         return "${libLinksDir.absolutePath}:${context.applicationInfo.nativeLibraryDir}"
+    }
+
+    private fun File.readTextOrNull(): String? {
+        return runCatching {
+            if (!exists() && !Files.isSymbolicLink(toPath())) return null
+            readText()
+        }.getOrNull()
+    }
+
+    private fun File.sizeOrNull(): Long? {
+        return runCatching {
+            if (!exists() && !Files.isSymbolicLink(toPath())) return null
+            length()
+        }.getOrNull()
+    }
+
+    private fun File.writePlainTextFile(content: String) {
+        parentFile?.mkdirs()
+        if ((exists() || Files.isSymbolicLink(toPath())) && !delete()) {
+            throw IOException("Cannot replace file: $absolutePath")
+        }
+        writeText(content)
     }
 
     private fun File.sha256OrNull(): String? {
@@ -518,8 +656,8 @@ class ProrootManager(
         return buildProrootCommand(
                 "export UV_USE_IO_URING=0 && " +
                 "export RUST_LOG=info && " +
-                "export PATH=$OPENCLAW_CODEX_APP_SERVER_PATH_DIR:/usr/local/bin:/usr/bin:/bin && " +
-                "export OPENCLAW_CODEX_APP_SERVER_BIN=$OPENCLAW_CODEX_APP_SERVER_BIN && " +
+                "export PATH=$codexAppServerPathDir:/usr/local/bin:/usr/bin:/bin && " +
+                "export OPENCLAW_CODEX_APP_SERVER_BIN=$codexAppServerBin && " +
                 "export OPENCLAW_CODEX_APP_SERVER_ARGS='app-server --listen stdio://' && " +
                 "export OPENCLAW_CODEX_APP_SERVER_MODE=yolo && " +
                 "export OPENCLAW_CODEX_APP_SERVER_APPROVAL_POLICY=never && " +
@@ -627,10 +765,13 @@ class ProrootManager(
         wrapInHostShell: Boolean = false,
         captureViaTempFile: Boolean = false,
         runtime: ExecutionRuntime = currentRuntime,
+        returnFailureDiagnostics: Boolean = false,
     ): CommandResult? {
+        var rawCmd: List<String>? = null
+        var cmd: List<String>? = null
         return try {
-            val rawCmd = buildProrootCommand(command, runtime)
-            val cmd = if (wrapInHostShell) buildHostShellWrappedCommand(rawCmd) else rawCmd
+            rawCmd = buildProrootCommand(command, runtime)
+            cmd = if (wrapInHostShell) buildHostShellWrappedCommand(rawCmd) else rawCmd
             val tempOutputFile = if (captureViaTempFile) File.createTempFile("proroot-capture-", ".log", context.cacheDir) else null
             val pb = ProcessBuilder(cmd)
                 .redirectErrorStream(true)
@@ -649,14 +790,12 @@ class ProrootManager(
                 process.destroyForcibly()
                 return CommandResult(
                     exitCode = -1,
-                    output = tempOutputFile?.takeIf { it.exists() }?.readText()?.trim()
-                        ?: process.inputStream.bufferedReader().readText().trim(),
+                    output = readCommandOutput(tempOutputFile, process),
                     timedOut = true,
                 )
             }
 
-            val output = tempOutputFile?.takeIf { it.exists() }?.readText()?.trim()
-                ?: process.inputStream.bufferedReader().readText().trim()
+            val output = readCommandOutput(tempOutputFile, process)
             android.util.Log.d("ProrootManager", "result: exit=${process.exitValue()}")
             output.lineSequence().forEach { line ->
                 android.util.Log.d("ProrootManager", "  out: $line")
@@ -665,8 +804,23 @@ class ProrootManager(
                 exitCode = process.exitValue(),
                 output = output,
             )
-        } catch (_: Exception) {
-            null
+        } catch (e: Exception) {
+            Log.e("ProrootManager", "executeWithResult failed: ${e.message}", e)
+            if (returnFailureDiagnostics) {
+                CommandResult(
+                    exitCode = -98,
+                    output = buildProcessFailureDiagnostics(
+                        error = e,
+                        command = command,
+                        rawCmd = rawCmd,
+                        cmd = cmd,
+                        extraEnv = extraEnv,
+                        runtime = runtime,
+                    ),
+                )
+            } else {
+                null
+            }
         }
     }
 
@@ -710,6 +864,47 @@ class ProrootManager(
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun buildProcessFailureDiagnostics(
+        error: Exception,
+        command: String,
+        rawCmd: List<String>?,
+        cmd: List<String>?,
+        extraEnv: Map<String, String>,
+        runtime: ExecutionRuntime,
+    ): String {
+        fun List<String>?.totalBytes(): Int = this?.sumOf { it.toByteArray(Charsets.UTF_8).size } ?: 0
+        fun List<String>?.maxArgBytes(): Int = this?.maxOfOrNull { it.toByteArray(Charsets.UTF_8).size } ?: 0
+        return buildString {
+            append("processStartFailure")
+            append(" runtime=").append(runtime.name)
+            append(" errorClass=").append(error.javaClass.name)
+            append(" message=").append(error.message ?: "")
+            append(" commandBytes=").append(command.toByteArray(Charsets.UTF_8).size)
+            append(" rawArgCount=").append(rawCmd?.size ?: 0)
+            append(" rawArgBytes=").append(rawCmd.totalBytes())
+            append(" rawMaxArgBytes=").append(rawCmd.maxArgBytes())
+            append(" argCount=").append(cmd?.size ?: 0)
+            append(" argBytes=").append(cmd.totalBytes())
+            append(" maxArgBytes=").append(cmd.maxArgBytes())
+            append(" extraEnvKeys=").append(extraEnv.keys.sorted().joinToString("|"))
+            append(" stack=").append(error.stackTraceToString())
+        }
+    }
+
+    private fun readCommandOutput(
+        tempOutputFile: File?,
+        process: Process,
+    ): String {
+        val tempOutput = tempOutputFile
+            ?.takeIf { it.exists() }
+            ?.let { file -> runCatching { file.readText().trim() }.getOrNull() }
+        if (tempOutput != null) {
+            return tempOutput
+        }
+        return runCatching { process.inputStream.bufferedReader().readText().trim() }
+            .getOrElse { "outputReadFailure=${it.javaClass.name}: ${it.message ?: ""}" }
     }
 
     /**

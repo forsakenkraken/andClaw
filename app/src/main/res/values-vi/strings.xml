@@ -234,6 +234,22 @@ Thất bại: %2$d</string>
     <string name="pairing_notification_text">%1$s: %2$s</string>
     <string name="settings_codex_oauth_title">Đăng nhập Codex</string>
     <string name="settings_codex_oauth_signing_in">Đang đăng nhập…</string>
+    <string name="settings_codex_oauth_reset_title">Đặt lại đăng nhập Codex</string>
+    <string name="settings_codex_oauth_reset_desc">Xóa trạng thái Codex đã lưu</string>
+    <string name="settings_codex_oauth_reset_confirm_message">Trạng thái đăng nhập Codex đã lưu sẽ bị xóa để có thể đăng nhập lại. Các nhà cung cấp khác không bị thay đổi.</string>
+    <string name="settings_codex_oauth_reset_action">Đặt lại</string>
+    <string name="settings_codex_oauth_reset_running">Đang đặt lại…</string>
+    <string name="settings_codex_oauth_reset_success">Đã đặt lại đăng nhập Codex. Đăng nhập lại để tiếp tục.</string>
+    <string name="settings_codex_oauth_reset_noop">Không tìm thấy đăng nhập Codex đã lưu.</string>
+    <string name="settings_codex_oauth_reset_failed">Đặt lại đăng nhập Codex không thành công: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_title">Chẩn đoán Codex</string>
+    <string name="settings_codex_oauth_diagnostics_desc">Kiểm tra trạng thái đã lưu</string>
+    <string name="settings_codex_oauth_diagnostics_running">Đang kiểm tra…</string>
+    <string name="settings_codex_oauth_diagnostics_result">Chẩn đoán Codex\n%1$s</string>
+    <string name="settings_codex_oauth_diagnostics_failed">Chẩn đoán Codex không thành công: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_view_full">Xem chẩn đoán đầy đủ</string>
+    <string name="settings_codex_oauth_diagnostics_copy">Sao chép</string>
+    <string name="settings_codex_oauth_diagnostics_copied">Đã sao chép chẩn đoán Codex.</string>
     <string name="settings_github_copilot_login_title">Đăng nhập GitHub</string>
     <string name="settings_github_copilot_login_signing_in">Đang chờ đăng nhập…</string>
     <string name="settings_github_copilot_login_code">Mã: %1$s</string>
@@ -345,10 +361,6 @@ Trong khi khôi phục đang chạy, đừng đóng hoặc buộc dừng ứng d
     <string name="settings_transfer_export_success">Xuất tệp chuyển thiết bị hoàn tất.</string>
     <string name="settings_transfer_share_failed">Không thể chia sẻ tệp chuyển thiết bị.</string>
 </resources>
-
-
-
-
 
 
 

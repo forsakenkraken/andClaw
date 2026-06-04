@@ -499,24 +499,31 @@ const { pathToFileURL } = require('node:url');
     };
   }
 
-  const recordsModuleCandidates = fs.readdirSync(openClawDist)
-    .filter((name) => /^installed-plugin-index-records-[A-Za-z0-9_-]+\.js$/.test(name));
-  if (recordsModuleCandidates.length === 0) {
-    throw new Error('Cannot find OpenClaw installed plugin index records module');
+  const storeModuleCandidates = fs.readdirSync(openClawDist)
+    .filter((name) => /^installed-plugin-index-store-[A-Za-z0-9_-]+\.js$/.test(name));
+  if (storeModuleCandidates.length === 0) {
+    throw new Error('Cannot find OpenClaw installed plugin index store module');
   }
-  let writeRecords = null;
-  for (const candidate of recordsModuleCandidates) {
+  let refreshPersistedInstalledPluginIndexSync = null;
+  for (const candidate of storeModuleCandidates) {
     const mod = await import(pathToFileURL(path.join(openClawDist, candidate)).href);
-    if (typeof mod.c === 'function') {
-      writeRecords = mod.c;
+    if (typeof mod.o === 'function') {
+      refreshPersistedInstalledPluginIndexSync = mod.o;
       break;
     }
   }
-  if (!writeRecords) {
-    throw new Error(\"No installed-plugin-index-records candidate exposes the 'c' write function. Candidates tried: \" + recordsModuleCandidates.join(', '));
+  if (!refreshPersistedInstalledPluginIndexSync) {
+    throw new Error(\"No installed-plugin-index-store candidate exposes the 'o' refresh function. Candidates tried: \" + storeModuleCandidates.join(', '));
   }
-  writeRecords(installRecords);
-  fs.copyFileSync('/root/.openclaw/plugins/installs.json', path.join(pluginRoot, 'install-records.json'));
+  const index = refreshPersistedInstalledPluginIndexSync({
+    reason: 'source-changed',
+    installRecords,
+    env: {
+      ...process.env,
+      OPENCLAW_STATE_DIR: '/root/.openclaw',
+    },
+  });
+  fs.writeFileSync(path.join(pluginRoot, 'install-records.json'), JSON.stringify(index, null, 2) + '\\n');
 })();
 NODE
         OPENCLAW_ASSET_VERSION=\"\$OPENCLAW_ASSET_VERSION\" node /tmp/write-andclaw-plugin-install-records.cjs

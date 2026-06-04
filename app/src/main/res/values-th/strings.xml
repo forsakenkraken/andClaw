@@ -234,6 +234,22 @@
     <string name="pairing_notification_text">%1$s: %2$s</string>
     <string name="settings_codex_oauth_title">ลงชื่อเข้าใช้ Codex</string>
     <string name="settings_codex_oauth_signing_in">กำลังลงชื่อเข้าใช้…</string>
+    <string name="settings_codex_oauth_reset_title">รีเซ็ตการลงชื่อเข้าใช้ Codex</string>
+    <string name="settings_codex_oauth_reset_desc">ลบสถานะ Codex ที่บันทึกไว้</string>
+    <string name="settings_codex_oauth_reset_confirm_message">ระบบจะลบสถานะการลงชื่อเข้าใช้ Codex ที่บันทึกไว้ เพื่อให้ลงชื่อเข้าใช้ใหม่ได้ ผู้ให้บริการอื่นจะไม่ถูกเปลี่ยนแปลง</string>
+    <string name="settings_codex_oauth_reset_action">รีเซ็ต</string>
+    <string name="settings_codex_oauth_reset_running">กำลังรีเซ็ต…</string>
+    <string name="settings_codex_oauth_reset_success">รีเซ็ตการลงชื่อเข้าใช้ Codex แล้ว ลงชื่อเข้าใช้อีกครั้งเพื่อดำเนินการต่อ</string>
+    <string name="settings_codex_oauth_reset_noop">ไม่พบการลงชื่อเข้าใช้ Codex ที่บันทึกไว้</string>
+    <string name="settings_codex_oauth_reset_failed">รีเซ็ตการลงชื่อเข้าใช้ Codex ไม่สำเร็จ: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_title">การวินิจฉัย Codex</string>
+    <string name="settings_codex_oauth_diagnostics_desc">ตรวจสอบสถานะที่บันทึกไว้</string>
+    <string name="settings_codex_oauth_diagnostics_running">กำลังตรวจสอบ…</string>
+    <string name="settings_codex_oauth_diagnostics_result">การวินิจฉัย Codex\n%1$s</string>
+    <string name="settings_codex_oauth_diagnostics_failed">การวินิจฉัย Codex ไม่สำเร็จ: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_view_full">ดูการวินิจฉัยทั้งหมด</string>
+    <string name="settings_codex_oauth_diagnostics_copy">คัดลอก</string>
+    <string name="settings_codex_oauth_diagnostics_copied">คัดลอกการวินิจฉัย Codex แล้ว</string>
     <string name="settings_github_copilot_login_title">ลงชื่อเข้าใช้ GitHub</string>
     <string name="settings_github_copilot_login_signing_in">กำลังรอการลงชื่อเข้าใช้…</string>
     <string name="settings_github_copilot_login_code">โค้ด: %1$s</string>
@@ -345,10 +361,6 @@
     <string name="settings_transfer_export_success">ส่งออกไฟล์ถ่ายโอนเสร็จแล้ว</string>
     <string name="settings_transfer_share_failed">ไม่สามารถแชร์ไฟล์ถ่ายโอนได้</string>
 </resources>
-
-
-
-
 
 
 

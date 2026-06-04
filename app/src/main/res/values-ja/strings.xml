@@ -235,6 +235,22 @@
     <string name="pairing_notification_text">%1$s: %2$s</string>
     <string name="settings_codex_oauth_title">Codex にログイン</string>
     <string name="settings_codex_oauth_signing_in">ログイン中…</string>
+    <string name="settings_codex_oauth_reset_title">Codex ログインをリセット</string>
+    <string name="settings_codex_oauth_reset_desc">保存済み Codex 状態を削除</string>
+    <string name="settings_codex_oauth_reset_confirm_message">保存済みの Codex ログイン状態を削除し、再ログインできるようにします。他のプロバイダー設定は変更されません。</string>
+    <string name="settings_codex_oauth_reset_action">リセット</string>
+    <string name="settings_codex_oauth_reset_running">リセット中…</string>
+    <string name="settings_codex_oauth_reset_success">Codex ログインをリセットしました。続行するには再度ログインしてください。</string>
+    <string name="settings_codex_oauth_reset_noop">保存済みの Codex ログインはありません。</string>
+    <string name="settings_codex_oauth_reset_failed">Codex ログインのリセットに失敗しました: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_title">Codex 診断</string>
+    <string name="settings_codex_oauth_diagnostics_desc">保存状態を確認</string>
+    <string name="settings_codex_oauth_diagnostics_running">確認中…</string>
+    <string name="settings_codex_oauth_diagnostics_result">Codex 診断\n%1$s</string>
+    <string name="settings_codex_oauth_diagnostics_failed">Codex 診断に失敗しました: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_view_full">診断全体を表示</string>
+    <string name="settings_codex_oauth_diagnostics_copy">コピー</string>
+    <string name="settings_codex_oauth_diagnostics_copied">Codex 診断をコピーしました。</string>
     <string name="settings_github_copilot_login_title">GitHub にログイン</string>
     <string name="settings_github_copilot_login_signing_in">ログイン待機中…</string>
     <string name="settings_github_copilot_login_code">コード: %1$s</string>
@@ -346,9 +362,5 @@
     <string name="settings_transfer_export_success">転送ファイルの書き出しが完了しました。</string>
     <string name="settings_transfer_share_failed">転送ファイルを共有できませんでした。</string>
 </resources>
-
-
-
-
 
 

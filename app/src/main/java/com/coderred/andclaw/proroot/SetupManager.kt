@@ -273,6 +273,11 @@ class SetupManager(
         val rootfsDir = prorootManager.rootfsDir
         log(">> Applying rootfs configuration...")
 
+        val osReleaseRepair = runCatching { prorootManager.repairRootfsOsReleaseFiles() }.getOrNull()
+        if (osReleaseRepair?.changed == true) {
+            log("   Rootfs OS release repaired (${osReleaseRepair.diagnosticSummary()})")
+        }
+
         // DNS
         File(rootfsDir, "etc/resolv.conf").apply {
             parentFile?.mkdirs()

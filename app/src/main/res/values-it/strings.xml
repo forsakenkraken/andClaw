@@ -235,6 +235,22 @@ Fallite: %2$d</string>
     <string name="pairing_notification_text">%1$s: %2$s</string>
     <string name="settings_codex_oauth_title">Accedi a Codex</string>
     <string name="settings_codex_oauth_signing_in">Accesso in corso…</string>
+    <string name="settings_codex_oauth_reset_title">Reimposta accesso Codex</string>
+    <string name="settings_codex_oauth_reset_desc">Cancella stato Codex salvato</string>
+    <string name="settings_codex_oauth_reset_confirm_message">Lo stato di accesso Codex salvato verrà cancellato per consentire un nuovo accesso. Gli altri provider non vengono modificati.</string>
+    <string name="settings_codex_oauth_reset_action">Reimposta</string>
+    <string name="settings_codex_oauth_reset_running">Reimpostazione…</string>
+    <string name="settings_codex_oauth_reset_success">Accesso Codex reimpostato. Accedere di nuovo per continuare.</string>
+    <string name="settings_codex_oauth_reset_noop">Nessun accesso Codex salvato trovato.</string>
+    <string name="settings_codex_oauth_reset_failed">Reimpostazione accesso Codex non riuscita: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_title">Diagnostica Codex</string>
+    <string name="settings_codex_oauth_diagnostics_desc">Ispeziona stato salvato</string>
+    <string name="settings_codex_oauth_diagnostics_running">Ispezione…</string>
+    <string name="settings_codex_oauth_diagnostics_result">Diagnostica Codex\n%1$s</string>
+    <string name="settings_codex_oauth_diagnostics_failed">Diagnostica Codex non riuscita: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_view_full">Mostra diagnostica completa</string>
+    <string name="settings_codex_oauth_diagnostics_copy">Copia</string>
+    <string name="settings_codex_oauth_diagnostics_copied">Diagnostica Codex copiata.</string>
     <string name="settings_github_copilot_login_title">Accedi a GitHub</string>
     <string name="settings_github_copilot_login_signing_in">In attesa di accesso…</string>
     <string name="settings_github_copilot_login_code">Codice: %1$s</string>
@@ -346,9 +362,5 @@ Non chiudere né forzare l’arresto dell’app mentre il ripristino è in corso
     <string name="settings_transfer_export_success">Esportazione del trasferimento completata.</string>
     <string name="settings_transfer_share_failed">Impossibile condividere il file di trasferimento.</string>
 </resources>
-
-
-
-
 
 

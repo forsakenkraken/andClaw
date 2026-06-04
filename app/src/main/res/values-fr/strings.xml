@@ -235,6 +235,22 @@ Certains éléments n’ont pas pu être supprimés.</string>
     <string name="pairing_notification_text">%1$s : %2$s</string>
     <string name="settings_codex_oauth_title">Connexion à Codex</string>
     <string name="settings_codex_oauth_signing_in">Connexion en cours…</string>
+    <string name="settings_codex_oauth_reset_title">Réinitialiser la connexion Codex</string>
+    <string name="settings_codex_oauth_reset_desc">Effacer l’état Codex enregistré</string>
+    <string name="settings_codex_oauth_reset_confirm_message">Cela efface l’état de connexion Codex enregistré afin de vous reconnecter. Les autres fournisseurs restent inchangés.</string>
+    <string name="settings_codex_oauth_reset_action">Réinitialiser</string>
+    <string name="settings_codex_oauth_reset_running">Réinitialisation…</string>
+    <string name="settings_codex_oauth_reset_success">Connexion Codex réinitialisée. Reconnectez-vous pour continuer.</string>
+    <string name="settings_codex_oauth_reset_noop">Aucune connexion Codex enregistrée trouvée.</string>
+    <string name="settings_codex_oauth_reset_failed">Échec de la réinitialisation de la connexion Codex : %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_title">Diagnostic Codex</string>
+    <string name="settings_codex_oauth_diagnostics_desc">Inspecter l’état enregistré</string>
+    <string name="settings_codex_oauth_diagnostics_running">Inspection…</string>
+    <string name="settings_codex_oauth_diagnostics_result">Diagnostic Codex\n%1$s</string>
+    <string name="settings_codex_oauth_diagnostics_failed">Échec du diagnostic Codex : %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_view_full">Voir le diagnostic complet</string>
+    <string name="settings_codex_oauth_diagnostics_copy">Copier</string>
+    <string name="settings_codex_oauth_diagnostics_copied">Diagnostic Codex copié.</string>
     <string name="settings_github_copilot_login_title">Connexion à GitHub</string>
     <string name="settings_github_copilot_login_signing_in">En attente de connexion…</string>
     <string name="settings_github_copilot_login_code">Code : %1$s</string>
@@ -346,9 +362,5 @@ Ne fermez pas l’application et ne forcez pas son arrêt tant que la récupéra
     <string name="settings_transfer_export_success">Export du fichier de transfert terminé.</string>
     <string name="settings_transfer_share_failed">Impossible de partager le fichier de transfert.</string>
 </resources>
-
-
-
-
 
 

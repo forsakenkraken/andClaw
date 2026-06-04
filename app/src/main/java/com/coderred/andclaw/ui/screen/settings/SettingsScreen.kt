@@ -70,7 +70,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -106,6 +108,8 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
 internal const val SETTINGS_SECTION_TOOLS = "tools"
+private const val CODEX_AUTH_DEBUG_DIALOG_AUTO_OPEN_THRESHOLD = 180
+private const val SHOW_CODEX_AUTH_MAINTENANCE_ACTIONS = false
 
 internal fun resolveInitialSettingsTabIndex(initialSection: String?): Int {
     return when (initialSection) {
@@ -172,6 +176,8 @@ fun SettingsScreen(
     val disconnectingChannelLabel by viewModel.disconnectingChannelLabel.collectAsState()
     val channelDisconnectError by viewModel.channelDisconnectError.collectAsState()
     val isCodexAuthInProgress by viewModel.isCodexAuthInProgress.collectAsState()
+    val isCodexAuthResetInProgress by viewModel.isCodexAuthResetInProgress.collectAsState()
+    val isCodexAuthDiagnosticsInProgress by viewModel.isCodexAuthDiagnosticsInProgress.collectAsState()
     val isCodexAuthenticated by viewModel.isCodexAuthenticated.collectAsState()
     val isGitHubCopilotAuthInProgress by viewModel.isGitHubCopilotAuthInProgress.collectAsState()
     val isGitHubCopilotAuthenticated by viewModel.isGitHubCopilotAuthenticated.collectAsState()
@@ -186,6 +192,7 @@ fun SettingsScreen(
     val bugReportUiState by viewModel.bugReportUiState.collectAsState()
     val transferUiState by viewModel.transferUiState.collectAsState()
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val providerLabelFor: (String) -> String = { provider ->
         when (provider) {
@@ -250,6 +257,8 @@ fun SettingsScreen(
     var showMemorySearchProviderDialog by remember { mutableStateOf(false) }
     var showMemorySearchApiKeyDialog by remember { mutableStateOf(false) }
     var showExecutionRuntimeDialog by remember { mutableStateOf(false) }
+    var showCodexAuthResetConfirmDialog by remember { mutableStateOf(false) }
+    var showCodexAuthDiagnosticsDialog by remember { mutableStateOf(false) }
     var showExtensionPruneConfirmDialog by remember { mutableStateOf(false) }
     var showOssLicensesDialog by remember { mutableStateOf(false) }
     var showRecoveryInstallConfirmDialog by remember { mutableStateOf(false) }
@@ -272,6 +281,8 @@ fun SettingsScreen(
             isOpenClawUpdateRunning ||
             isOpenClawExtensionPruneRunning ||
             isCodexAuthInProgress ||
+            isCodexAuthResetInProgress ||
+            isCodexAuthDiagnosticsInProgress ||
             isGitHubCopilotAuthInProgress
     val openClawVersionInfoText = if (!installedOpenClawVersion.isNullOrBlank() && !bundledOpenClawVersion.isNullOrBlank()) {
         if (isOpenClawUpdateAvailable) {
@@ -326,6 +337,14 @@ fun SettingsScreen(
                 Toast.makeText(context, context.getString(R.string.settings_cannot_open), Toast.LENGTH_SHORT).show()
             } finally {
                 viewModel.consumeCodexAuthUrl()
+            }
+        }
+    }
+    if (SHOW_CODEX_AUTH_MAINTENANCE_ACTIONS) {
+        LaunchedEffect(codexAuthDebugLine) {
+            val debugLine = codexAuthDebugLine
+            if (!debugLine.isNullOrBlank() && debugLine.length > CODEX_AUTH_DEBUG_DIALOG_AUTO_OPEN_THRESHOLD) {
+                showCodexAuthDiagnosticsDialog = true
             }
         }
     }
@@ -606,15 +625,43 @@ fun SettingsScreen(
                                 valueColor = if (!isCodexAuthenticated && !isCodexAuthInProgress) MaterialTheme.colorScheme.error else null,
                                 onClick = { viewModel.loginOpenAiCodexOAuth() },
                             )
-                            if (codexAuthDebugLine != null) {
-                                Text(
-                                    text = codexAuthDebugLine ?: "",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 12.dp),
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
+                            if (SHOW_CODEX_AUTH_MAINTENANCE_ACTIONS) {
+                                SettingClickableRow(
+                                    title = stringResource(R.string.settings_codex_oauth_reset_title),
+                                    value = if (isCodexAuthResetInProgress) {
+                                        stringResource(R.string.settings_codex_oauth_reset_running)
+                                    } else {
+                                        stringResource(R.string.settings_codex_oauth_reset_desc)
+                                    },
+                                    enabled = !isCodexAuthInProgress && !isCodexAuthResetInProgress && !isCodexAuthDiagnosticsInProgress,
+                                    onClick = { showCodexAuthResetConfirmDialog = true },
                                 )
+                                SettingClickableRow(
+                                    title = stringResource(R.string.settings_codex_oauth_diagnostics_title),
+                                    value = if (isCodexAuthDiagnosticsInProgress) {
+                                        stringResource(R.string.settings_codex_oauth_diagnostics_running)
+                                    } else {
+                                        stringResource(R.string.settings_codex_oauth_diagnostics_desc)
+                                    },
+                                    enabled = !isCodexAuthInProgress && !isCodexAuthResetInProgress && !isCodexAuthDiagnosticsInProgress,
+                                    onClick = { viewModel.diagnoseOpenAiCodexOAuth() },
+                                )
+                                if (codexAuthDebugLine != null) {
+                                    Text(
+                                        text = codexAuthDebugLine ?: "",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(start = 20.dp, end = 20.dp),
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    TextButton(
+                                        modifier = Modifier.padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
+                                        onClick = { showCodexAuthDiagnosticsDialog = true },
+                                    ) {
+                                        Text(stringResource(R.string.settings_codex_oauth_diagnostics_view_full))
+                                    }
+                                }
                             }
                         } else {
                             SettingClickableRow(
@@ -1389,6 +1436,74 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showExecutionRuntimeDialog = false }) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+        )
+    }
+
+    if (showCodexAuthResetConfirmDialog) {
+        AlertDialog(
+            onDismissRequest = { showCodexAuthResetConfirmDialog = false },
+            shape = RoundedCornerShape(24.dp),
+            title = { Text(stringResource(R.string.settings_codex_oauth_reset_title)) },
+            text = {
+                Text(
+                    text = stringResource(R.string.settings_codex_oauth_reset_confirm_message),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !isCodexAuthResetInProgress && !isCodexAuthDiagnosticsInProgress,
+                    onClick = {
+                        showCodexAuthResetConfirmDialog = false
+                        viewModel.resetOpenAiCodexOAuth()
+                    },
+                ) {
+                    Text(stringResource(R.string.settings_codex_oauth_reset_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCodexAuthResetConfirmDialog = false }) {
+                    Text(stringResource(android.R.string.cancel))
+                }
+            },
+        )
+    }
+
+    val currentCodexDebugLine = codexAuthDebugLine
+    if (showCodexAuthDiagnosticsDialog && !currentCodexDebugLine.isNullOrBlank()) {
+        AlertDialog(
+            onDismissRequest = { showCodexAuthDiagnosticsDialog = false },
+            shape = RoundedCornerShape(24.dp),
+            title = { Text(stringResource(R.string.settings_codex_oauth_diagnostics_title)) },
+            text = {
+                Text(
+                    text = currentCodexDebugLine,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState()),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(currentCodexDebugLine))
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.settings_codex_oauth_diagnostics_copied),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                    },
+                ) {
+                    Text(stringResource(R.string.settings_codex_oauth_diagnostics_copy))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCodexAuthDiagnosticsDialog = false }) {
                     Text(stringResource(android.R.string.ok))
                 }
             },

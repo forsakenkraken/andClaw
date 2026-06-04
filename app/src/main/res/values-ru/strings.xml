@@ -234,6 +234,22 @@
     <string name="pairing_notification_text">%1$s: %2$s</string>
     <string name="settings_codex_oauth_title">Войти в Codex</string>
     <string name="settings_codex_oauth_signing_in">Выполняется вход…</string>
+    <string name="settings_codex_oauth_reset_title">Сбросить вход в Codex</string>
+    <string name="settings_codex_oauth_reset_desc">Удалить сохранённое состояние Codex</string>
+    <string name="settings_codex_oauth_reset_confirm_message">Сохранённое состояние входа в Codex будет удалено, чтобы можно было войти снова. Другие поставщики не изменятся.</string>
+    <string name="settings_codex_oauth_reset_action">Сбросить</string>
+    <string name="settings_codex_oauth_reset_running">Выполняется сброс…</string>
+    <string name="settings_codex_oauth_reset_success">Вход в Codex сброшен. Войдите снова, чтобы продолжить.</string>
+    <string name="settings_codex_oauth_reset_noop">Сохранённый вход в Codex не найден.</string>
+    <string name="settings_codex_oauth_reset_failed">Не удалось сбросить вход в Codex: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_title">Диагностика Codex</string>
+    <string name="settings_codex_oauth_diagnostics_desc">Проверить сохранённое состояние</string>
+    <string name="settings_codex_oauth_diagnostics_running">Выполняется проверка…</string>
+    <string name="settings_codex_oauth_diagnostics_result">Диагностика Codex\n%1$s</string>
+    <string name="settings_codex_oauth_diagnostics_failed">Диагностика Codex не удалась: %1$s</string>
+    <string name="settings_codex_oauth_diagnostics_view_full">Показать диагностику полностью</string>
+    <string name="settings_codex_oauth_diagnostics_copy">Копировать</string>
+    <string name="settings_codex_oauth_diagnostics_copied">Диагностика Codex скопирована.</string>
     <string name="settings_github_copilot_login_title">Войти в GitHub</string>
     <string name="settings_github_copilot_login_signing_in">Ожидание входа…</string>
     <string name="settings_github_copilot_login_code">Код: %1$s</string>
@@ -345,10 +361,6 @@
     <string name="settings_transfer_export_success">Экспорт файла переноса завершен.</string>
     <string name="settings_transfer_share_failed">Не удалось поделиться файлом переноса.</string>
 </resources>
-
-
-
-
 
 
 
