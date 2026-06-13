@@ -1,5 +1,6 @@
 package com.coderred.andclaw.ui.screen.settings
 
+import com.coderred.andclaw.proroot.OpenClawAuthProfileStore
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -92,7 +93,7 @@ internal object CodexAuthResetter {
 
     fun reset(rootfsDir: File): Result {
         val before = diagnose(rootfsDir)
-        val authProfileResult = resetAuthProfiles(rootfsDir.resolve(OPENCLAW_AUTH_PROFILES_PATH))
+        val authProfileResult = OpenClawAuthProfileStore.resetCodexOAuthProfiles(rootfsDir)
         val authStateChanged = resetAuthState(
             stateFile = rootfsDir.resolve(OPENCLAW_AUTH_STATE_PATH),
             removedProfileIds = authProfileResult.removedProfileIds,
@@ -178,64 +179,6 @@ internal object CodexAuthResetter {
         val capturedBadRequestCount: Int,
         val capturedHosts: List<String>,
     )
-
-    private data class AuthProfileResetResult(
-        val changed: Boolean,
-        val removedProfileIds: Set<String>,
-        val keptProfileIds: Set<String>,
-    )
-
-    private fun resetAuthProfiles(authFile: File): AuthProfileResetResult {
-        if (!authFile.isFile) {
-            return AuthProfileResetResult(
-                changed = false,
-                removedProfileIds = emptySet(),
-                keptProfileIds = emptySet(),
-            )
-        }
-
-        val root = JSONObject(authFile.readText())
-        val profiles = root.optJSONObject("profiles") ?: return AuthProfileResetResult(
-            changed = false,
-            removedProfileIds = emptySet(),
-            keptProfileIds = emptySet(),
-        )
-        val removedProfileIds = collectCodexOAuthProfileIds(profiles)
-        if (removedProfileIds.isEmpty()) {
-            return AuthProfileResetResult(
-                changed = false,
-                removedProfileIds = emptySet(),
-                keptProfileIds = profiles.keyList().toSet(),
-            )
-        }
-
-        for (profileId in removedProfileIds) {
-            profiles.remove(profileId)
-        }
-        val keptProfileIds = profiles.keyList().toSet()
-        pruneProviderProfileReferences(root, removedProfileIds, keptProfileIds)
-        authFile.writeText(root.toString(2))
-
-        return AuthProfileResetResult(
-            changed = true,
-            removedProfileIds = removedProfileIds,
-            keptProfileIds = keptProfileIds,
-        )
-    }
-
-    private fun collectCodexOAuthProfileIds(profiles: JSONObject): Set<String> {
-        val removed = linkedSetOf<String>()
-        for (profileId in profiles.keyList()) {
-            val profile = profiles.optJSONObject(profileId) ?: continue
-            val provider = profile.optString("provider").trim().lowercase()
-            val type = profile.optString("type").trim().lowercase()
-            when {
-                provider == "openai-codex" -> removed += profileId
-                provider == "openai" && type == "oauth" && isCodexMirrorProfile(profileId, profile) -> removed += profileId
-            }
-        }
-        return removed
-    }
 
     private fun isCodexMirrorProfile(profileId: String, profile: JSONObject): Boolean {
         val hasOAuthMaterial = profile.optString("access").isNotBlank() ||

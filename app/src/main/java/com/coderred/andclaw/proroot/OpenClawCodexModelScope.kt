@@ -8,6 +8,7 @@ object OpenClawCodexModelScope {
     const val CODEX_PROVIDER = "codex"
 
     private const val PROVIDER_SWITCH_VERSION = "2026.6.1"
+    private const val CODEX_APP_SERVER_OPENAI_AUTH_VERSION = "2026.6.1"
     private const val LEGACY_DEFAULT_MODEL = "gpt-5.3-codex"
     private const val CODEX_DEFAULT_MODEL = "gpt-5.5"
     private val CODEX_PROVIDER_MODEL_IDS = setOf("gpt-5.5", "gpt-5.4-mini")
@@ -24,6 +25,10 @@ object OpenClawCodexModelScope {
 
     fun providerForInstalledVersion(version: String?): String {
         return if (isAtLeast(version, PROVIDER_SWITCH_VERSION)) CODEX_PROVIDER else LEGACY_PROVIDER
+    }
+
+    fun usesOpenAiAppServerAuth(version: String?): Boolean {
+        return isAtLeast(version, CODEX_APP_SERVER_OPENAI_AUTH_VERSION)
     }
 
     fun providerForRootfs(rootfsDir: File?): String {

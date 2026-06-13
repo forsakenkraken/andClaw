@@ -47,6 +47,7 @@ import com.coderred.andclaw.data.hasOpenClawSecretRef
 import com.coderred.andclaw.proroot.BundleUpdateOutcome
 import com.coderred.andclaw.proroot.ExecutionRuntime
 import com.coderred.andclaw.proroot.GatewayWsClient
+import com.coderred.andclaw.proroot.OpenClawAuthProfileStore
 import com.coderred.andclaw.proroot.OpenClawCodexModelScope
 import com.coderred.andclaw.proroot.OpenClawModelCatalogReader
 import com.coderred.andclaw.proroot.ProcessManager
@@ -3798,38 +3799,13 @@ class SettingsViewModel(
     }
 
     private fun writeCodexOAuthCredentials(token: OAuthTokenResult, accountId: String) {
-        val authFile = File(prorootManager.rootfsDir, "root/.openclaw/agents/main/agent/auth-profiles.json")
-        authFile.parentFile?.mkdirs()
-
-        val root = if (authFile.exists()) {
-            runCatching { JSONObject(authFile.readText()) }.getOrElse { JSONObject() }
-        } else JSONObject()
-
-        if (!root.has("version")) {
-            root.put("version", 1)
-        }
-        val profiles = root.optJSONObject("profiles") ?: JSONObject().also { root.put("profiles", it) }
-
-        val codexCredential = JSONObject().apply {
-            put("type", "oauth")
-            put("provider", "openai-codex")
-            put("access", token.access)
-            put("refresh", token.refresh)
-            put("expires", token.expires)
-            put("accountId", accountId)
-        }
-        val openAiCredential = JSONObject(codexCredential.toString()).apply {
-            put("provider", "openai")
-        }
-
-        profiles.put("openai-codex:default", codexCredential)
-        profiles.put("openai:default", openAiCredential)
-
-        val lastGood = root.optJSONObject("lastGood") ?: JSONObject().also { root.put("lastGood", it) }
-        lastGood.put("openai-codex", "openai-codex:default")
-        lastGood.put("openai", "openai:default")
-
-        authFile.writeText(root.toString(2))
+        OpenClawAuthProfileStore.writeCodexOAuthCredentials(
+            rootfsDir = prorootManager.rootfsDir,
+            accessToken = token.access,
+            refreshToken = token.refresh,
+            expires = token.expires,
+            accountId = accountId,
+        )
     }
 
     private fun syncApiKeyAuthProfile(provider: String, apiKey: String) {

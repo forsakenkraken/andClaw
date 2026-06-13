@@ -1210,6 +1210,9 @@ class ProcessManager(
             }
 
             val installedOpenClawVersion = readInstalledOpenClawVersion()
+            if (OpenClawCodexModelScope.usesOpenAiAppServerAuth(installedOpenClawVersion)) {
+                ensureCodexAppServerOpenAiAuthProfileMirror()
+            }
             val installedCodexBareModelIds = if (apiProvider == "openai-codex") {
                 readInstalledCodexBareModelIds(installedOpenClawVersion)
             } else {
@@ -1629,6 +1632,7 @@ class ProcessManager(
                 apiProvider = apiProvider,
                 selectedEntries = normalizedSelectedEntries,
                 providerScopedModels = targetModels.toSet(),
+                primaryProviderScopedModel = targetModel,
                 installedOpenClawVersion = installedOpenClawVersion,
             )
 
@@ -1721,6 +1725,18 @@ class ProcessManager(
         val repaired = normalizeDirectoryPermissions(openClawDir)
         if (repaired > 0) {
             addLog("[andClaw] Repaired OpenClaw directory permissions ($repaired dirs)")
+        }
+    }
+
+    private fun ensureCodexAppServerOpenAiAuthProfileMirror() {
+        runCatching {
+            val changed = OpenClawAuthProfileStore.mirrorCodexAppServerOpenAiProfile(prorootManager.rootfsDir)
+            if (changed) {
+                addLog("[andClaw] Mirrored Codex OAuth profile for Codex app-server auth")
+            }
+            changed
+        }.onFailure { throwable ->
+            addLog("[andClaw] Codex app-server auth profile migration failed: ${throwable.message}")
         }
     }
 
@@ -2426,6 +2442,7 @@ class ProcessManager(
         apiProvider: String,
         selectedEntries: List<ModelSelectionEntry>,
         providerScopedModels: Set<String>,
+        primaryProviderScopedModel: String,
         installedOpenClawVersion: String?,
     ) {
         val selectedModelIds = selectedAgentModelIds(
@@ -2439,8 +2456,18 @@ class ProcessManager(
             apiProvider = apiProvider,
             installedOpenClawVersion = installedOpenClawVersion,
         )
+        val targetSessionModel = targetAgentSessionModel(
+            apiProvider = apiProvider,
+            targetProvider = targetProvider,
+            providerScopedModel = primaryProviderScopedModel,
+        )
+        if (targetSessionModel.isBlank()) return
+
         sanitizeAgentModelsJson(apiProvider, selectedModelIds, targetProvider)
-        sanitizeAgentSessionsJson(apiProvider, selectedModelIds, providerScopedModels, targetProvider)
+        sanitizeAgentSessionsJson(
+            targetProvider = targetProvider,
+            targetModel = targetSessionModel,
+        )
     }
 
     private fun sanitizeAgentModelsJson(
@@ -2527,10 +2554,8 @@ class ProcessManager(
     }
 
     private fun sanitizeAgentSessionsJson(
-        apiProvider: String,
-        selectedModelIds: Set<String>,
-        providerScopedModels: Set<String>,
         targetProvider: String,
+        targetModel: String,
     ) {
         val file = File(prorootManager.rootfsDir, "root/.openclaw/agents/main/sessions/sessions.json")
         if (!file.exists()) return
@@ -2542,49 +2567,10 @@ class ProcessManager(
 
             keys.forEach { key ->
                 val entry = root.optJSONObject(key) ?: return@forEach
-                val overrideModel = entry.optString("modelOverride").trim()
-                if (overrideModel.isNotBlank() && !isSelectedAgentModelReference(
-                        apiProvider = apiProvider,
-                        provider = entry.optString("providerOverride").trim(),
-                        model = overrideModel,
-                        selectedModelIds = selectedModelIds,
-                        providerScopedModels = providerScopedModels,
-                    )
-                ) {
-                    entry.remove("providerOverride")
-                    entry.remove("modelOverride")
-                    entry.remove("modelOverrideSource")
-                    entry.remove("modelOverrideCompactionCount")
-                    changed = true
-                } else if (overrideModel.isNotBlank() && normalizeSelectedAgentSessionModelState(
-                        apiProvider = apiProvider,
-                        targetProvider = targetProvider,
+                if (syncAgentSessionModelStateToPrimary(
                         entry = entry,
-                        providerKey = "providerOverride",
-                        modelKey = "modelOverride",
-                    )
-                ) {
-                    changed = true
-                }
-
-                val model = entry.optString("model").trim()
-                if (model.isNotBlank() && !isSelectedAgentModelReference(
-                        apiProvider = apiProvider,
-                        provider = entry.optString("modelProvider").trim(),
-                        model = model,
-                        selectedModelIds = selectedModelIds,
-                        providerScopedModels = providerScopedModels,
-                    )
-                ) {
-                    entry.remove("modelProvider")
-                    entry.remove("model")
-                    changed = true
-                } else if (model.isNotBlank() && normalizeSelectedAgentSessionModelState(
-                        apiProvider = apiProvider,
                         targetProvider = targetProvider,
-                        entry = entry,
-                        providerKey = "modelProvider",
-                        modelKey = "model",
+                        targetModel = targetModel,
                     )
                 ) {
                     changed = true
@@ -2593,40 +2579,70 @@ class ProcessManager(
 
             if (changed) {
                 file.writeText(root.toString(2))
-                addLog("[andClaw] Pruned stale agent session model state")
+                addLog("[andClaw] Synced agent session model state to primary model")
             }
         }.onFailure { throwable ->
-            addLog("[andClaw] Failed to prune agent sessions.json: ${throwable.message}")
+            addLog("[andClaw] Failed to sync agent sessions.json: ${throwable.message}")
         }
     }
 
-    private fun isSelectedAgentModelReference(
-        apiProvider: String,
-        provider: String,
-        model: String,
-        selectedModelIds: Set<String>,
-        providerScopedModels: Set<String>,
+    private fun syncAgentSessionModelStateToPrimary(
+        entry: JSONObject,
+        targetProvider: String,
+        targetModel: String,
     ): Boolean {
-        val normalizedModel = model.trim()
-        if (normalizedModel.isBlank()) return false
+        var changed = false
+        val previousOverrideModel = entry.optString("modelOverride").trim()
+        val previousModel = entry.optString("model").trim()
+        val overrideModelChanged = previousOverrideModel.isNotBlank() &&
+            normalizeAgentSessionModelForComparison(targetProvider, previousOverrideModel) != targetModel
+        val sessionModelChanged = previousModel.isNotBlank() &&
+            normalizeAgentSessionModelForComparison(targetProvider, previousModel) != targetModel
+        val modelChanged = overrideModelChanged || sessionModelChanged
 
-        val normalizedProvider = provider.trim().lowercase()
-        val allowedProviders = agentProviderNamesForApiProvider(apiProvider)
-        if (normalizedProvider.isNotBlank() && normalizedProvider !in allowedProviders) return false
-        if (normalizedModel in providerScopedModels) return true
-
-        val normalizedModelForProvider = normalizeAgentModelsJsonModelId(apiProvider, normalizedModel)
-        if (normalizedModel in selectedModelIds) return true
-        if (normalizedModelForProvider in selectedModelIds) return true
-
-        val providerAliases = if (normalizedProvider.isBlank()) {
-            allowedProviders
-        } else {
-            providerAliasesForAgentModel(provider)
+        fun putStringIfChanged(key: String, value: String) {
+            if (entry.optString(key) != value) {
+                entry.put(key, value)
+                changed = true
+            }
         }
-        return providerAliases.any { alias ->
-            "$alias/$normalizedModel" in providerScopedModels ||
-                "$alias/$normalizedModelForProvider" in providerScopedModels
+
+        putStringIfChanged("providerOverride", targetProvider)
+        putStringIfChanged("modelOverride", targetModel)
+        putStringIfChanged("modelProvider", targetProvider)
+        putStringIfChanged("model", targetModel)
+
+        if (modelChanged) {
+            if (entry.has("modelOverrideSource")) {
+                entry.remove("modelOverrideSource")
+                changed = true
+            }
+            if (entry.has("modelOverrideCompactionCount")) {
+                entry.remove("modelOverrideCompactionCount")
+                changed = true
+            }
+        }
+
+        return changed
+    }
+
+    private fun normalizeAgentSessionModelForComparison(
+        targetProvider: String,
+        model: String,
+    ): String {
+        val normalizedModel = model.trim()
+        if (normalizedModel.isBlank()) return ""
+        val aliases = providerAliasesForAgentModel(targetProvider) + targetProvider.trim().lowercase()
+        val unscoped = aliases
+            .firstNotNullOfOrNull { alias ->
+                normalizedModel.removePrefix("$alias/")
+                    .takeIf { it.length != normalizedModel.length }
+            }
+            ?: normalizedModel
+        return if (targetProvider in codexAgentProviderAliases()) {
+            OpenClawCodexModelScope.bareModelId(unscoped)
+        } else {
+            unscoped
         }
     }
 
@@ -2697,6 +2713,21 @@ class ProcessManager(
         }
     }
 
+    private fun targetAgentSessionModel(
+        apiProvider: String,
+        targetProvider: String,
+        providerScopedModel: String,
+    ): String {
+        val normalizedModel = providerScopedModel.trim()
+        val targetPrefix = "${targetProvider.trim().lowercase()}/"
+        val bareModel = if (normalizedModel.startsWith(targetPrefix)) {
+            normalizedModel.removePrefix(targetPrefix)
+        } else {
+            normalizedModel
+        }
+        return normalizeAgentModelsJsonModelId(apiProvider, bareModel)
+    }
+
     private fun shouldRewriteAgentModelProvider(apiProvider: String): Boolean {
         return apiProvider.trim().lowercase() == "openai-codex"
     }
@@ -2705,48 +2736,6 @@ class ProcessManager(
         return when (apiProvider.trim().lowercase()) {
             "openai-codex" -> OpenClawCodexModelScope.bareModelId(modelId)
             else -> modelId.trim()
-        }
-    }
-
-    private fun normalizeSelectedAgentSessionModelState(
-        apiProvider: String,
-        targetProvider: String,
-        entry: JSONObject,
-        providerKey: String,
-        modelKey: String,
-    ): Boolean {
-        if (!shouldRewriteAgentModelProvider(apiProvider)) return false
-        val currentProvider = entry.optString(providerKey).trim()
-        val currentModel = entry.optString(modelKey).trim()
-        if (!isCodexAgentModelReference(currentProvider, currentModel)) return false
-
-        var changed = false
-        if (currentProvider != targetProvider) {
-            entry.put(providerKey, targetProvider)
-            changed = true
-        }
-
-        val bareModel = OpenClawCodexModelScope.bareModelId(currentModel)
-        if (bareModel.isNotBlank() && bareModel != currentModel) {
-            entry.put(modelKey, bareModel)
-            changed = true
-        }
-        return changed
-    }
-
-    private fun isCodexAgentModelReference(provider: String, model: String): Boolean {
-        val normalizedProvider = provider.trim().lowercase()
-        val normalizedModel = model.trim().lowercase()
-        return normalizedProvider in codexAgentProviderAliases() ||
-            normalizedModel.startsWith("${OpenClawCodexModelScope.LEGACY_PROVIDER}/") ||
-            normalizedModel.startsWith("${OpenClawCodexModelScope.CODEX_PROVIDER}/")
-    }
-
-    private fun agentProviderNamesForApiProvider(apiProvider: String): Set<String> {
-        return when (val provider = apiProvider.trim().lowercase()) {
-            "openai-codex" -> codexAgentProviderAliases()
-            "ollama", "ollama-cloud" -> setOf("ollama", "ollama-cloud")
-            else -> setOf(provider)
         }
     }
 

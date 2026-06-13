@@ -44,7 +44,7 @@ data class BugReportSessionErrorEntry(
 
 object BugReportBundleBuilder {
     fun collectSupplementalRuntimeAttachments(rootfsDir: File): List<BugReportTextAttachment> {
-        return SUPPLEMENTAL_RUNTIME_LOG_FILES.mapNotNull { spec ->
+        return collectSupplementalRuntimeLogSpecs(rootfsDir).mapNotNull { spec ->
             val file = resolveSupplementalRuntimeFile(rootfsDir, spec) ?: return@mapNotNull null
             if (!file.isFile) return@mapNotNull null
 
@@ -58,7 +58,7 @@ object BugReportBundleBuilder {
     fun collectSupplementalRuntimeLogLines(rootfsDir: File): List<String> {
         val lines = mutableListOf<String>()
 
-        SUPPLEMENTAL_RUNTIME_LOG_FILES.forEach { spec ->
+        collectSupplementalRuntimeLogSpecs(rootfsDir).forEach { spec ->
             val file = resolveSupplementalRuntimeFile(rootfsDir, spec) ?: return@forEach
             if (!file.isFile) return@forEach
 
@@ -165,6 +165,7 @@ private fun String.sanitizeGatewayLogLine(): String {
 private const val MAX_GATEWAY_LOG_LINES = 400
 private const val MAX_GATEWAY_LOG_LINE_LENGTH = 500
 private const val MAX_SUPPLEMENTAL_RUNTIME_LOG_LINES_PER_FILE = 200
+private const val MAX_OPENCLAW_RUNTIME_LOG_FILES = 2
 private const val PROROOT_PRESERVE_KEYWORD = "proroot"
 
 private enum class SupplementalRuntimeBase { ROOTFS, ROOTFS_PARENT }
@@ -185,6 +186,7 @@ private data class SupplementalRuntimeLogSpec(
 private enum class SupplementalRuntimeSanitizeMode {
     NONE,
     LAUNCHER_POSTMORTEM,
+    OPENCLAW_LOG_TAIL,
 }
 
 private fun resolveSupplementalRuntimeFile(
@@ -215,7 +217,43 @@ private val SUPPLEMENTAL_RUNTIME_LOG_FILES = listOf(
         sourceRelativePath = "proroot-sigbus-maps.txt",
         zipEntryName = "runtime/proroot-sigbus-maps.txt",
     ),
+    SupplementalRuntimeLogSpec(
+        base = SupplementalRuntimeBase.ROOTFS,
+        sourceRelativePath = "root/.openclaw/agents/main/agent/codex-home/codex-http-metrics.jsonl",
+        zipEntryName = "runtime/codex/codex-http-metrics.jsonl",
+        sanitizeMode = SupplementalRuntimeSanitizeMode.OPENCLAW_LOG_TAIL,
+    ),
 )
+
+private val OPENCLAW_LOG_FILE_REGEX = Regex("""openclaw-\d{4}-\d{2}-\d{2}\.log""")
+
+private fun collectSupplementalRuntimeLogSpecs(rootfsDir: File): List<SupplementalRuntimeLogSpec> {
+    return SUPPLEMENTAL_RUNTIME_LOG_FILES + collectOpenClawRuntimeLogSpecs(rootfsDir)
+}
+
+private fun collectOpenClawRuntimeLogSpecs(rootfsDir: File): List<SupplementalRuntimeLogSpec> {
+    val openClawLogDir = File(rootfsDir, "tmp/openclaw")
+    if (!openClawLogDir.isDirectory) return emptyList()
+
+    return openClawLogDir
+        .listFiles { file ->
+            file.isFile && OPENCLAW_LOG_FILE_REGEX.matches(file.name)
+        }
+        .orEmpty()
+        .sortedWith(
+            compareByDescending<File> { it.lastModified() }
+                .thenByDescending { it.name }
+        )
+        .take(MAX_OPENCLAW_RUNTIME_LOG_FILES)
+        .map { file ->
+            SupplementalRuntimeLogSpec(
+                base = SupplementalRuntimeBase.ROOTFS,
+                sourceRelativePath = "tmp/openclaw/${file.name}",
+                zipEntryName = "runtime/openclaw/${file.name}",
+                sanitizeMode = SupplementalRuntimeSanitizeMode.OPENCLAW_LOG_TAIL,
+            )
+        }
+}
 
 private fun sanitizeSupplementalRuntimeFileContent(
     file: File,
@@ -225,6 +263,9 @@ private fun sanitizeSupplementalRuntimeFileContent(
         SupplementalRuntimeSanitizeMode.NONE -> file.readText()
         SupplementalRuntimeSanitizeMode.LAUNCHER_POSTMORTEM -> file.useLines { sequence ->
             sanitizeSupplementalRuntimeLines(sequence.toList(), spec).joinToString("\n")
+        }
+        SupplementalRuntimeSanitizeMode.OPENCLAW_LOG_TAIL -> file.useLines { sequence ->
+            sanitizeSupplementalRuntimeLines(sequence.toList(), spec).joinToString("\n", postfix = "\n")
         }
     }
 }
@@ -236,6 +277,9 @@ private fun sanitizeSupplementalRuntimeLines(
     return when (spec.sanitizeMode) {
         SupplementalRuntimeSanitizeMode.NONE -> lines
         SupplementalRuntimeSanitizeMode.LAUNCHER_POSTMORTEM -> sanitizeLauncherPostmortemLines(lines)
+        SupplementalRuntimeSanitizeMode.OPENCLAW_LOG_TAIL -> lines
+            .takeLast(MAX_SUPPLEMENTAL_RUNTIME_LOG_LINES_PER_FILE)
+            .map { it.trimEnd().sanitizeGatewayLogLine() }
     }
 }
 
@@ -275,7 +319,7 @@ private fun sanitizeSensitiveLauncherArg(argValue: String): String {
     return sanitizeGatewayLogLineUnbounded(argValue)
 }
 private const val SECRET_KEY_PATTERN =
-    "TELEGRAM_BOT_TOKEN|DISCORD_BOT_TOKEN|OPENROUTER_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|GOOGLE_API_KEY|GEMINI_API_KEY|COPILOT_GITHUB_TOKEN|GH_TOKEN|GITHUB_TOKEN|ZAI_API_KEY|Z_AI_API_KEY|KIMI_API_KEY|KIMICODE_API_KEY|MINIMAX_API_KEY|BRAVE_API_KEY|BRAVE_SEARCH_API_KEY|API_KEY|API-KEY|AUTHORIZATION|PASSWORD|SECRET|TOKEN|ACCESS_TOKEN|REFRESH_TOKEN|ID_TOKEN|X_API_KEY|X-API-KEY"
+    "TELEGRAM_BOT_TOKEN|DISCORD_BOT_TOKEN|OPENROUTER_API_KEY|OPENAI_API_KEY|ANTHROPIC_API_KEY|GOOGLE_API_KEY|GEMINI_API_KEY|COPILOT_GITHUB_TOKEN|GH_TOKEN|GITHUB_TOKEN|ZAI_API_KEY|Z_AI_API_KEY|KIMI_API_KEY|KIMICODE_API_KEY|MINIMAX_API_KEY|BRAVE_API_KEY|BRAVE_SEARCH_API_KEY|API_KEY|API-KEY|AUTHORIZATION|COOKIE|PASSWORD|SECRET|TOKEN|ACCESS_TOKEN|REFRESH_TOKEN|ID_TOKEN|X_API_KEY|X-API-KEY"
 private val JSON_SECRET_REGEX = Regex(
     "(?i)(\"(?:$SECRET_KEY_PATTERN)\"\\s*:\\s*\")([^\"]+)(\")"
 )
@@ -289,7 +333,9 @@ private val KEY_VALUE_SECRET_REGEX = Regex(
     "(?i)\\b($SECRET_KEY_PATTERN)\\b\\s*([=:])\\s*[^\\s,;]+"
 )
 private val BEARER_REGEX = Regex("(?i)bearer\\s+[a-z0-9._\\-]+")
-private val QUERY_SECRET_REGEX = Regex("(?i)([?&](?:token|api_key|key)=)[^&\\s]+")
+private val QUERY_SECRET_REGEX = Regex(
+    "(?i)([?&](?:token|api_key|key|access_token|refresh_token|id_token|email_token)=)[^&\\s]+"
+)
 private val RAW_KEY_REGEX = Regex("\\b(?:sk|or|rk)-[A-Za-z0-9_\\-]{8,}\\b")
 private val ARG_LINE_REGEX = Regex("""^(\[proroot] launcher: argv\[\d+]=)(.*)$""")
 private val SENSITIVE_LAUNCHER_NEXT_ARG_FLAGS = setOf(
