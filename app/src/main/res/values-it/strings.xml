@@ -344,8 +344,12 @@ Non chiudere né forzare l’arresto dell’app mentre il ripristino è in corso
     <string name="settings_transfer_password_label">Password di trasferimento</string>
     <string name="settings_transfer_export_confirm">Esporta</string>
     <string name="settings_transfer_import_confirm">Importa</string>
-    <string name="settings_transfer_overwrite_title">Sovrascrivere i dati attuali del dispositivo?</string>
-    <string name="settings_transfer_overwrite_message">Questa operazione importa i dati di un altro dispositivo e sovrascrive lo stato attuale di questo dispositivo.</string>
+    <string name="settings_transfer_overwrite_title">Sovrascrivere questo dispositivo con un backup di un altro dispositivo?</string>
+    <string name="settings_transfer_overwrite_message">L’importazione da un altro dispositivo sostituisce impostazioni OpenClaw, accessi, sessioni e memoria di questo dispositivo con il contenuto del backup.</string>
+    <string name="settings_transfer_version_mismatch_title">Versione andClaw diversa</string>
+    <string name="settings_transfer_version_mismatch_message">Il trasferimento dispositivo è pienamente compatibile solo con la stessa versione di andClaw, ma questo file è stato creato con una versione diversa. Importarlo comunque?</string>
+    <string name="settings_transfer_version_mismatch_yes">Sì</string>
+    <string name="settings_transfer_version_mismatch_no">No</string>
     <string name="settings_transfer_progress_export">Creazione del file di trasferimento crittografato…</string>
     <string name="settings_transfer_progress_import">Importazione del file di trasferimento crittografato…</string>
     <string name="settings_transfer_success_title">Trasferimento del dispositivo completato</string>
@@ -356,11 +360,9 @@ Non chiudere né forzare l’arresto dell’app mentre il ripristino è in corso
     <string name="settings_transfer_error_password_too_short">La password deve contenere almeno %1$d caratteri.</string>
     <string name="settings_transfer_error_import_password_required">La password di importazione è obbligatoria.</string>
     <string name="settings_transfer_error_wrong_password">Password errata o file di trasferimento danneggiato.</string>
-    <string name="settings_transfer_error_version_mismatch">Versione dell\'app non corrispondente. Aggiorna entrambi i dispositivi alla stessa versione e riprova.</string>
+    <string name="settings_transfer_error_version_mismatch">Questo file di trasferimento è stato creato con una versione diversa di andClaw.</string>
     <string name="settings_transfer_error_export_failed">Impossibile esportare il file di trasferimento.</string>
     <string name="settings_transfer_error_import_failed">Impossibile importare il file di trasferimento.</string>
     <string name="settings_transfer_export_success">Esportazione del trasferimento completata.</string>
     <string name="settings_transfer_share_failed">Impossibile condividere il file di trasferimento.</string>
 </resources>
-
-

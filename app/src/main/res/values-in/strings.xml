@@ -343,8 +343,12 @@ Jangan tutup atau paksa hentikan aplikasi selama pemulihan masih berlangsung.</s
     <string name="settings_transfer_password_label">Kata sandi transfer</string>
     <string name="settings_transfer_export_confirm">Ekspor</string>
     <string name="settings_transfer_import_confirm">Impor</string>
-    <string name="settings_transfer_overwrite_title">Timpa data perangkat saat ini?</string>
-    <string name="settings_transfer_overwrite_message">Ini akan mengimpor data dari perangkat lain dan menimpa keadaan perangkat saat ini.</string>
+    <string name="settings_transfer_overwrite_title">Timpa perangkat ini dengan cadangan dari perangkat lain?</string>
+    <string name="settings_transfer_overwrite_message">Mengimpor dari perangkat lain akan mengganti pengaturan OpenClaw, login, sesi, dan memori perangkat ini dengan isi cadangan.</string>
+    <string name="settings_transfer_version_mismatch_title">Versi andClaw berbeda</string>
+    <string name="settings_transfer_version_mismatch_message">Transfer perangkat hanya sepenuhnya kompatibel dengan versi andClaw yang sama, tetapi file transfer ini dibuat dengan versi berbeda. Tetap impor?</string>
+    <string name="settings_transfer_version_mismatch_yes">Ya</string>
+    <string name="settings_transfer_version_mismatch_no">Tidak</string>
     <string name="settings_transfer_progress_export">Membuat file transfer terenkripsi…</string>
     <string name="settings_transfer_progress_import">Mengimpor file transfer terenkripsi…</string>
     <string name="settings_transfer_success_title">Transfer perangkat selesai</string>
@@ -355,12 +359,9 @@ Jangan tutup atau paksa hentikan aplikasi selama pemulihan masih berlangsung.</s
     <string name="settings_transfer_error_password_too_short">Kata sandi harus minimal %1$d karakter.</string>
     <string name="settings_transfer_error_import_password_required">Kata sandi impor diperlukan.</string>
     <string name="settings_transfer_error_wrong_password">Kata sandi salah atau file transfer rusak.</string>
-    <string name="settings_transfer_error_version_mismatch">Versi aplikasi tidak cocok. Perbarui kedua perangkat ke versi yang sama dan coba lagi.</string>
+    <string name="settings_transfer_error_version_mismatch">File transfer ini dibuat dengan versi andClaw yang berbeda.</string>
     <string name="settings_transfer_error_export_failed">Gagal mengekspor file transfer.</string>
     <string name="settings_transfer_error_import_failed">Gagal mengimpor file transfer.</string>
     <string name="settings_transfer_export_success">Ekspor transfer selesai.</string>
     <string name="settings_transfer_share_failed">File transfer tidak dapat dibagikan.</string>
 </resources>
-
-
-

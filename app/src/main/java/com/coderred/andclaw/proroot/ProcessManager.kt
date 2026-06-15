@@ -572,6 +572,7 @@ class ProcessManager(
             try {
                 // 패치 파일이 없으면 생성
                 ensurePatchFile()
+                ensureCodexAppServerDiagnosticsWrapper()
                 // .profile에 누락된 환경변수 보충 + 캐시 디렉토리 보장 (기존 사용자 대응)
                 ensureProfileEnvVars()
                 invalidateCompileCacheIfVersionChanged()
@@ -666,14 +667,15 @@ class ProcessManager(
                     put("OPENCLAW_DISABLE_BONJOUR", "1")
                     put("OPENCLAW_CODEX_DISCOVERY_LIVE", "0")
                     put("PLAYWRIGHT_BROWSERS_PATH", "/root/.cache/ms-playwright")
-                    put("RUST_LOG", "info")
+                    put("RUST_LOG", ProrootManager.CODEX_RUST_LOG_FILTER)
+                    put("RUST_BACKTRACE", "1")
                     val prorootGatewayLog = File(prorootManager.rootfsDir, "tmp/proroot-gateway.log").absolutePath
                     put("PROROOT_LOG_APPEND", prorootGatewayLog)
                     put("PROROOT_STUB_LOG", prorootGatewayLog)
                     put("PROROOT_STUB_TRACE_DYN", "1")
                     put("PROROOT_STUB_BLOCK_TARGET_SECCOMP", "1")
                     put("PROROOT_STUB_PRESERVE_SIGSEGV", "1")
-                    put("OPENCLAW_CODEX_APP_SERVER_BIN", prorootManager.codexAppServerBin)
+                    put("OPENCLAW_CODEX_APP_SERVER_BIN", ProrootManager.OPENCLAW_CODEX_APP_SERVER_WRAPPER)
                     put("OPENCLAW_CODEX_APP_SERVER_MODE", CODEX_APP_SERVER_MODE)
                     put("OPENCLAW_CODEX_APP_SERVER_APPROVAL_POLICY", CODEX_APP_SERVER_APPROVAL_POLICY)
                     put("OPENCLAW_CODEX_APP_SERVER_SANDBOX", CODEX_APP_SERVER_SANDBOX)
@@ -2147,9 +2149,9 @@ class ProcessManager(
             appServer.put("transport", CODEX_APP_SERVER_TRANSPORT)
             changed = true
         }
-        val resolvedCodexBin = prorootManager.codexAppServerBin
-        if (appServer.optString("command", "").trim() != resolvedCodexBin) {
-            appServer.put("command", resolvedCodexBin)
+        val resolvedCodexCommand = ensureCodexAppServerDiagnosticsWrapper()
+        if (appServer.optString("command", "").trim() != resolvedCodexCommand) {
+            appServer.put("command", resolvedCodexCommand)
             changed = true
         }
         if (!jsonArrayStringListEquals(appServer.optJSONArray("args"), CODEX_APP_SERVER_ARGS)) {
@@ -2847,6 +2849,47 @@ class ProcessManager(
             stale.forEach { it.deleteRecursively() }
             addLog("[andClaw] Cleaned ${stale.size} stale compile cache dirs")
         }
+    }
+
+    private fun ensureCodexAppServerDiagnosticsWrapper(): String {
+        val wrapperPath = ProrootManager.OPENCLAW_CODEX_APP_SERVER_WRAPPER
+        val wrapperFile = File(prorootManager.rootfsDir, wrapperPath.removePrefix("/"))
+        val realCodexBin = prorootManager.codexAppServerBin
+        val content = buildString {
+            appendLine("#!/bin/bash")
+            appendLine("set -u")
+            appendLine("REAL_CODEX_BIN=${shellSingleQuote(realCodexBin)}")
+            appendLine("CODEX_RUST_LOG_PATH=${ProrootManager.CODEX_RUST_LOG_PATH}")
+            appendLine("mkdir -p \"\$(dirname \"\$CODEX_RUST_LOG_PATH\")\"")
+            appendLine("if [ -f \"\$CODEX_RUST_LOG_PATH\" ]; then")
+            appendLine("  size=\$(wc -c < \"\$CODEX_RUST_LOG_PATH\")")
+            appendLine("  if [ \"\$size\" -gt 1048576 ]; then")
+            appendLine("    mv -f \"\$CODEX_RUST_LOG_PATH\" \"\$CODEX_RUST_LOG_PATH.1\"")
+            appendLine("  fi")
+            appendLine("fi")
+            appendLine("export RUST_LOG=\"\${RUST_LOG:-${ProrootManager.CODEX_RUST_LOG_FILTER}}\"")
+            appendLine("export RUST_BACKTRACE=\"\${RUST_BACKTRACE:-1}\"")
+            appendLine(
+                "exec \"\$REAL_CODEX_BIN\" \"\$@\" " +
+                    "2> >(while IFS= read -r line; do " +
+                    "printf '%s\\n' \"\$line\" >> \"\$CODEX_RUST_LOG_PATH\"; " +
+                    "printf '%s\\n' \"\$line\" >&2; " +
+                    "done)",
+            )
+        }
+        if (!wrapperFile.exists() || wrapperFile.readText() != content || !wrapperFile.canExecute()) {
+            wrapperFile.parentFile?.mkdirs()
+            wrapperFile.writeText(content)
+            wrapperFile.setReadable(true, false)
+            wrapperFile.setWritable(true, true)
+            wrapperFile.setExecutable(true, false)
+            addLog("[andClaw] Codex app-server Rust stderr wrapper installed")
+        }
+        return wrapperPath
+    }
+
+    private fun shellSingleQuote(value: String): String {
+        return "'" + value.replace("'", "'\\''") + "'"
     }
 
     private fun ensurePatchFile() {

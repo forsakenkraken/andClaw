@@ -355,8 +355,12 @@ Failed: %2$d</string>
     <string name="settings_transfer_password_label">Transfer password</string>
     <string name="settings_transfer_export_confirm">Export</string>
     <string name="settings_transfer_import_confirm">Import</string>
-    <string name="settings_transfer_overwrite_title">Overwrite current device data?</string>
-    <string name="settings_transfer_overwrite_message">This imports data from another device and overwrites the current device state.</string>
+    <string name="settings_transfer_overwrite_title">Overwrite this device with another device backup?</string>
+    <string name="settings_transfer_overwrite_message">Importing from another device replaces this device\'s OpenClaw settings, sign-ins, sessions, and memory with the backup contents.</string>
+    <string name="settings_transfer_version_mismatch_title">Different andClaw version</string>
+    <string name="settings_transfer_version_mismatch_message">Device transfer is fully compatible only with the same andClaw version, but this transfer file was made with a different version. Import anyway?</string>
+    <string name="settings_transfer_version_mismatch_yes">Yes</string>
+    <string name="settings_transfer_version_mismatch_no">No</string>
     <string name="settings_transfer_progress_export">Creating encrypted transfer file…</string>
     <string name="settings_transfer_progress_import">Importing encrypted transfer file…</string>
     <string name="settings_transfer_success_title">Device transfer complete</string>
@@ -367,7 +371,7 @@ Failed: %2$d</string>
     <string name="settings_transfer_error_password_too_short">Password must be at least %1$d characters.</string>
     <string name="settings_transfer_error_import_password_required">Import password is required.</string>
     <string name="settings_transfer_error_wrong_password">Wrong password or damaged transfer file.</string>
-    <string name="settings_transfer_error_version_mismatch">App version mismatch. Update both devices to the same version and try again.</string>
+    <string name="settings_transfer_error_version_mismatch">This transfer file was made with a different andClaw version.</string>
     <string name="settings_transfer_error_export_failed">Failed to export transfer file.</string>
     <string name="settings_transfer_error_import_failed">Failed to import transfer file.</string>
     <string name="settings_transfer_export_success">Transfer export completed.</string>

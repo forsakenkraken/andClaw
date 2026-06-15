@@ -344,8 +344,12 @@
     <string name="settings_transfer_password_label">転送パスワード</string>
     <string name="settings_transfer_export_confirm">書き出す</string>
     <string name="settings_transfer_import_confirm">取り込む</string>
-    <string name="settings_transfer_overwrite_title">現在の端末データを上書きしますか？</string>
-    <string name="settings_transfer_overwrite_message">別の端末のデータを取り込み、現在の端末状態を上書きします。</string>
+    <string name="settings_transfer_overwrite_title">別の端末のバックアップでこの端末を上書きしますか？</string>
+    <string name="settings_transfer_overwrite_message">別の端末から取り込むと、この端末の OpenClaw 設定、サインイン、セッション、メモリがバックアップ内容で置き換えられます。</string>
+    <string name="settings_transfer_version_mismatch_title">andClaw のバージョンが異なります</string>
+    <string name="settings_transfer_version_mismatch_message">端末転送は同じ andClaw バージョンでのみ完全に互換性がありますが、この転送ファイルは別のバージョンで作成されています。それでも取り込みますか？</string>
+    <string name="settings_transfer_version_mismatch_yes">はい</string>
+    <string name="settings_transfer_version_mismatch_no">いいえ</string>
     <string name="settings_transfer_progress_export">暗号化された転送ファイルを作成中…</string>
     <string name="settings_transfer_progress_import">暗号化された転送ファイルを取り込み中…</string>
     <string name="settings_transfer_success_title">端末転送が完了しました</string>
@@ -356,11 +360,9 @@
     <string name="settings_transfer_error_password_too_short">パスワードは%1$d文字以上必要です。</string>
     <string name="settings_transfer_error_import_password_required">取り込みパスワードが必要です。</string>
     <string name="settings_transfer_error_wrong_password">パスワードが違うか、転送ファイルが壊れています。</string>
-    <string name="settings_transfer_error_version_mismatch">アプリのバージョンが一致しません。両方のデバイスを同じバージョンに更新してからもう一度お試しください。</string>
+    <string name="settings_transfer_error_version_mismatch">この転送ファイルは別の andClaw バージョンで作成されています。</string>
     <string name="settings_transfer_error_export_failed">転送ファイルを書き出せませんでした。</string>
     <string name="settings_transfer_error_import_failed">転送ファイルを取り込めませんでした。</string>
     <string name="settings_transfer_export_success">転送ファイルの書き出しが完了しました。</string>
     <string name="settings_transfer_share_failed">転送ファイルを共有できませんでした。</string>
 </resources>
-
-

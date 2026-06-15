@@ -173,9 +173,15 @@ class SettingsViewModel(
         val pendingArtifactPath: String? = null,
     )
 
+    data class TransferVersionMismatchConfirmationState(
+        val isRequired: Boolean = false,
+        val pendingArtifactPath: String? = null,
+    )
+
     data class TransferUiState(
         val passwords: TransferPasswordUiState = TransferPasswordUiState(),
         val overwriteConfirmation: TransferOverwriteConfirmationState = TransferOverwriteConfirmationState(),
+        val versionMismatchConfirmation: TransferVersionMismatchConfirmationState = TransferVersionMismatchConfirmationState(),
         val exportAction: TransferActionUiState = TransferActionUiState(),
         val importAction: TransferActionUiState = TransferActionUiState(),
     )
@@ -2048,8 +2054,61 @@ class SettingsViewModel(
             return
         }
 
+        startTransferImport(
+            currentState = currentState,
+            artifactFile = artifactFile,
+            importPassword = importPassword,
+            allowVersionMismatch = false,
+        )
+    }
+
+    fun cancelTransferImportVersionMismatchConfirmation() {
+        pendingTransferImportArtifact = null
+        _transferUiState.value = _transferUiState.value.copy(
+            passwords = _transferUiState.value.passwords.copy(importPassword = ""),
+            versionMismatchConfirmation = TransferVersionMismatchConfirmationState(),
+            importAction = TransferActionUiState(),
+        )
+    }
+
+    fun confirmTransferImportVersionMismatch() {
+        val currentState = _transferUiState.value
+        if (!currentState.versionMismatchConfirmation.isRequired) return
+        if (currentState.importAction.phase == TransferActionPhase.IN_PROGRESS) return
+        if (isTransferBlockedByMaintenance()) return
+
+        val artifactFile = pendingTransferImportArtifact
+            ?: currentState.versionMismatchConfirmation.pendingArtifactPath?.let(::File)
+            ?: return
+        val importPassword = currentState.passwords.importPassword
+        if (importPassword.isBlank()) {
+            _transferUiState.value = currentState.copy(
+                importAction = TransferActionUiState(
+                    phase = TransferActionPhase.ERROR,
+                    message = appString(R.string.settings_transfer_error_import_password_required),
+                    failureReason = TransferFailureUiReason.UNKNOWN,
+                ),
+            )
+            return
+        }
+
+        startTransferImport(
+            currentState = currentState,
+            artifactFile = artifactFile,
+            importPassword = importPassword,
+            allowVersionMismatch = true,
+        )
+    }
+
+    private fun startTransferImport(
+        currentState: TransferUiState,
+        artifactFile: File,
+        importPassword: String,
+        allowVersionMismatch: Boolean,
+    ) {
         _transferUiState.value = currentState.copy(
             overwriteConfirmation = TransferOverwriteConfirmationState(),
+            versionMismatchConfirmation = TransferVersionMismatchConfirmationState(),
             importAction = TransferActionUiState(
                 phase = TransferActionPhase.IN_PROGRESS,
                 message = appString(R.string.settings_transfer_progress_import),
@@ -2072,6 +2131,7 @@ class SettingsViewModel(
                 rootfsDir = rootfsDir,
                 preferencesRestorer = createTransferPreferencesRestorer(),
                 gatewayController = createTransferGatewayController(app),
+                allowVersionMismatch = allowVersionMismatch,
             )
             val result = transferManager.import(SettingsTransferImportRequest(request = importRequest))
             withContext(Dispatchers.Main) {
@@ -2098,6 +2158,15 @@ class SettingsViewModel(
                                     phase = TransferActionPhase.SUCCESS,
                                     message = appString(R.string.settings_transfer_import_success),
                                 ),
+                            )
+                        } else if (result.reason == SettingsTransferFailureReason.VERSION_MISMATCH && !allowVersionMismatch) {
+                            pendingTransferImportArtifact = artifactFile
+                            _transferUiState.value.copy(
+                                versionMismatchConfirmation = TransferVersionMismatchConfirmationState(
+                                    isRequired = true,
+                                    pendingArtifactPath = artifactFile.absolutePath,
+                                ),
+                                importAction = TransferActionUiState(),
                             )
                         } else {
                             _transferUiState.value.copy(
@@ -2224,8 +2293,10 @@ class SettingsViewModel(
         return when (result.reason) {
             SettingsTransferFailureReason.WRONG_PASSWORD -> appString(R.string.settings_transfer_error_wrong_password)
             SettingsTransferFailureReason.VERSION_MISMATCH -> appString(R.string.settings_transfer_error_version_mismatch)
-            SettingsTransferFailureReason.TRANSIENT_RUNTIME -> appString(R.string.settings_transfer_error_export_failed)
-            SettingsTransferFailureReason.UNKNOWN -> appString(R.string.settings_transfer_error_export_failed)
+            SettingsTransferFailureReason.TRANSIENT_RUNTIME,
+            SettingsTransferFailureReason.UNKNOWN -> result.message.trim()
+                .takeIf { it.isNotEmpty() }
+                ?: appString(R.string.settings_transfer_error_export_failed)
         }
     }
 

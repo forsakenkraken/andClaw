@@ -76,6 +76,10 @@ class ProrootManager(
         private const val CODEX_VENDOR_SUFFIX = "@openai/codex-linux-arm64/vendor/aarch64-unknown-linux-musl"
         const val OPENCLAW_CODEX_APP_SERVER_BIN_FALLBACK = "$CODEX_PLUGINS_BASE/$CODEX_VENDOR_SUFFIX/codex/codex"
         const val OPENCLAW_CODEX_APP_SERVER_PATH_DIR_FALLBACK = "$CODEX_PLUGINS_BASE/$CODEX_VENDOR_SUFFIX/path"
+        const val OPENCLAW_CODEX_APP_SERVER_WRAPPER = "/root/.openclaw/andclaw-codex-app-server.sh"
+        const val CODEX_RUST_LOG_PATH = "/root/.openclaw/agents/main/agent/codex-home/codex-rust.log"
+        const val CODEX_RUST_LOG_FILTER =
+            "info,codex_api::endpoint::responses=debug,codex_api::sse::responses=debug,codex_app_server=debug"
         const val GUEST_HOOK_LIB_PATH = "/root/.proroot/libproroot-runtime.so"
 
         const val GUEST_VFORK_SHIM_PATH = "/root/.proroot/libvfork_shim.so"
@@ -655,9 +659,10 @@ class ProrootManager(
     fun buildGatewayCommand(runtime: ExecutionRuntime = currentRuntime): List<String> {
         return buildProrootCommand(
                 "export UV_USE_IO_URING=0 && " +
-                "export RUST_LOG=info && " +
+                "export RUST_LOG='$CODEX_RUST_LOG_FILTER' && " +
+                "export RUST_BACKTRACE=1 && " +
                 "export PATH=$codexAppServerPathDir:/usr/local/bin:/usr/bin:/bin && " +
-                "export OPENCLAW_CODEX_APP_SERVER_BIN=$codexAppServerBin && " +
+                "export OPENCLAW_CODEX_APP_SERVER_BIN=$OPENCLAW_CODEX_APP_SERVER_WRAPPER && " +
                 "export OPENCLAW_CODEX_APP_SERVER_ARGS='app-server --listen stdio://' && " +
                 "export OPENCLAW_CODEX_APP_SERVER_MODE=yolo && " +
                 "export OPENCLAW_CODEX_APP_SERVER_APPROVAL_POLICY=never && " +

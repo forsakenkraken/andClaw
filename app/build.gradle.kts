@@ -37,8 +37,8 @@ android {
         applicationId = "com.coderred.andclaw"
         minSdk = 26
         targetSdk = 35
-        versionCode = 292
-        versionName = "2.2.53"
+        versionCode = 299
+        versionName = "2.2.60"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

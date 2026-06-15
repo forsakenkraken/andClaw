@@ -44,6 +44,7 @@ class TransferRestoreRequest(
     val rootfsDir: File,
     val preferencesRestorer: TransferPreferencesRestorer,
     val gatewayController: TransferGatewayQuiesceController,
+    val allowVersionMismatch: Boolean = false,
 ) {
     override fun toString(): String = "TransferRestoreRequest(artifactFile=${artifactFile.name}, password=***)"
 }
@@ -69,7 +70,6 @@ object TransferRestoreManager {
     private const val ENTRY_MANIFEST = "manifest.json"
     private const val ENTRY_PREFERENCES = "preferences.json"
     private const val ENTRY_CHECKSUMS = "checksums.json"
-    private const val MAX_EXTRACTED_TRANSFER_BYTES = 512L * 1024L * 1024L
     suspend fun restore(request: TransferRestoreRequest): TransferRestoreResult {
         val tempRoot = createTempDirectory(request.artifactFile.parentFile ?: request.rootfsDir, "transfer-restore")
         val decryptTempFile = File(tempRoot, "decrypted.zip")
@@ -91,6 +91,7 @@ object TransferRestoreManager {
             val validatedPayload = validateStagedPayload(
                 stageDir = stageDir,
                 expectedVersion = request.expectedVersion,
+                allowVersionMismatch = request.allowVersionMismatch,
             )
 
             wasGatewayActiveBeforeRestore = request.gatewayController.quiesceForRestore()
@@ -232,8 +233,11 @@ object TransferRestoreManager {
                         val read = zipInput.read(buffer)
                         if (read < 0) break
                         totalExtractedBytes += read
-                        if (totalExtractedBytes > MAX_EXTRACTED_TRANSFER_BYTES) {
-                            throw TransferRestoreException("Transfer payload expands beyond the allowed size limit")
+                        if (totalExtractedBytes > TransferSizeLimits.MAX_TRANSFER_PAYLOAD_BYTES) {
+                            throw TransferRestoreException(
+                                "Transfer payload expands beyond the allowed size limit " +
+                                    "(${TransferSizeLimits.MAX_TRANSFER_PAYLOAD_BYTES / 1024 / 1024}MB)"
+                            )
                         }
                         output.write(buffer, 0, read)
                     }
@@ -262,6 +266,7 @@ object TransferRestoreManager {
     private fun validateStagedPayload(
         stageDir: File,
         expectedVersion: TransferVersionExpectation,
+        allowVersionMismatch: Boolean,
     ): ValidatedPayload {
         val manifestFile = File(stageDir, ENTRY_MANIFEST)
         if (!manifestFile.exists() || !manifestFile.isFile) {
@@ -286,7 +291,10 @@ object TransferRestoreManager {
 
         val versionGate = TransferManifestContract.evaluateExactVersionGate(manifest, expectedVersion)
         if (!versionGate.accepted) {
-            throw TransferRestoreException(versionGate.reason ?: "Transfer version mismatch")
+            val reason = versionGate.reason ?: "Transfer version mismatch"
+            if (!allowVersionMismatch || !isOverridableVersionMismatch(reason)) {
+                throw TransferRestoreException(reason)
+            }
         }
 
         val checksumsByPath = parseChecksums(checksumsFile)
@@ -362,6 +370,10 @@ object TransferRestoreManager {
             out[key] = root.optString(key, "")
         }
         return out.toMap()
+    }
+
+    private fun isOverridableVersionMismatch(reason: String): Boolean {
+        return reason == "versionCode mismatch" || reason == "versionName mismatch"
     }
 
     private fun collectStagedFilesByRelativePath(stageDir: File): Map<String, File> {

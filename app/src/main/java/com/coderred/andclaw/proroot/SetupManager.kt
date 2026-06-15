@@ -625,16 +625,23 @@ class SetupManager(
         )
         if (!templateFile.exists()) return
 
-        val templateRecords = JSONObject(templateFile.readText()).optJSONObject("installRecords")
+        val template = JSONObject(templateFile.readText())
+        val templateRecords = template.optJSONObject("installRecords")
             ?: throw SetupException("Bundled OpenClaw plugin install records are missing installRecords")
         if (templateRecords.length() == 0) return
 
         val registryFile = File(prorootManager.rootfsDir, "root/.openclaw/plugins/installs.json")
         registryFile.parentFile?.mkdirs()
-        val template = JSONObject(templateFile.readText())
         if (!registryFile.exists()) {
             registryFile.writeText(template.toString(2))
             log("   OpenClaw bundled plugin registry installed")
+            logOpenClawSharedPluginRecordMerge(
+                OpenClawPluginInstallStateStore.mergeBundledInstallRecords(
+                    rootfsDir = prorootManager.rootfsDir,
+                    template = template,
+                    nowEpochMs = nowEpochMs(),
+                ),
+            )
             return
         }
         val registry = JSONObject(registryFile.readText())
@@ -642,12 +649,7 @@ class SetupManager(
             registry.put("installRecords", it)
         }
 
-        var merged = 0
-        listOf("whatsapp", "discord", "codex").forEach { pluginId ->
-            val record = templateRecords.optJSONObject(pluginId) ?: return@forEach
-            installRecords.put(pluginId, JSONObject(record.toString()))
-            merged += 1
-        }
+        val merged = OpenClawPluginInstallStateStore.mergeManagedInstallRecords(installRecords, templateRecords)
 
         listOf(
             "version",
@@ -660,30 +662,26 @@ class SetupManager(
             }
         }
 
-        val templatePluginsById = mutableMapOf<String, JSONObject>()
-        val templatePlugins = template.optJSONArray("plugins") ?: JSONArray()
-        for (index in 0 until templatePlugins.length()) {
-            val plugin = templatePlugins.optJSONObject(index) ?: continue
-            val pluginId = plugin.optString("pluginId").trim()
-            if (pluginId == "whatsapp" || pluginId == "discord" || pluginId == "codex") {
-                templatePluginsById[pluginId] = plugin
-            }
-        }
         val existingPlugins = registry.optJSONArray("plugins") ?: JSONArray()
-        val mergedPlugins = JSONArray()
-        for (index in 0 until existingPlugins.length()) {
-            val plugin = existingPlugins.optJSONObject(index) ?: continue
-            val pluginId = plugin.optString("pluginId").trim()
-            if (pluginId != "whatsapp" && pluginId != "discord" && pluginId != "codex") {
-                mergedPlugins.put(plugin)
-            }
-        }
-        listOf("whatsapp", "discord", "codex").forEach { pluginId ->
-            templatePluginsById[pluginId]?.let { mergedPlugins.put(JSONObject(it.toString())) }
-        }
-        registry.put("plugins", mergedPlugins)
+        registry.put(
+            "plugins",
+            OpenClawPluginInstallStateStore.mergeManagedPluginEntries(existingPlugins, template),
+        )
         registryFile.writeText(registry.toString(2))
         log("   OpenClaw bundled plugin records merged ($merged)")
+        logOpenClawSharedPluginRecordMerge(
+            OpenClawPluginInstallStateStore.mergeBundledInstallRecords(
+                rootfsDir = prorootManager.rootfsDir,
+                template = template,
+                nowEpochMs = nowEpochMs(),
+            ),
+        )
+    }
+
+    private fun logOpenClawSharedPluginRecordMerge(result: OpenClawPluginInstallStateStore.MergeResult) {
+        if (!result.changed) return
+        val stale = result.staleManagedPluginIds.ifEmpty { listOf("none") }.joinToString(",")
+        log("   OpenClaw shared plugin records merged (${result.mergedRecords}; staleBefore=$stale)")
     }
 
     private fun readInstalledOpenClawVersion(): String? {

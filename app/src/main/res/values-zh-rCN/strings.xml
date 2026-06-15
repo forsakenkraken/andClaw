@@ -344,8 +344,12 @@
     <string name="settings_transfer_password_label">传输密码</string>
     <string name="settings_transfer_export_confirm">导出</string>
     <string name="settings_transfer_import_confirm">导入</string>
-    <string name="settings_transfer_overwrite_title">覆盖当前设备数据吗？</string>
-    <string name="settings_transfer_overwrite_message">这将导入另一台设备的数据，并覆盖当前设备的状态。</string>
+    <string name="settings_transfer_overwrite_title">用另一台设备的备份覆盖此设备？</string>
+    <string name="settings_transfer_overwrite_message">从另一台设备导入会用备份内容替换此设备的 OpenClaw 设置、登录、会话和记忆。</string>
+    <string name="settings_transfer_version_mismatch_title">andClaw 版本不同</string>
+    <string name="settings_transfer_version_mismatch_message">设备传输只有在相同 andClaw 版本之间才完全兼容，但此传输文件由不同版本创建。仍要导入吗？</string>
+    <string name="settings_transfer_version_mismatch_yes">是</string>
+    <string name="settings_transfer_version_mismatch_no">否</string>
     <string name="settings_transfer_progress_export">正在创建加密的传输文件…</string>
     <string name="settings_transfer_progress_import">正在导入加密的传输文件…</string>
     <string name="settings_transfer_success_title">设备传输完成</string>
@@ -356,11 +360,9 @@
     <string name="settings_transfer_error_password_too_short">密码至少需要 %1$d 个字符。</string>
     <string name="settings_transfer_error_import_password_required">需要导入密码。</string>
     <string name="settings_transfer_error_wrong_password">密码错误或传输文件已损坏。</string>
-    <string name="settings_transfer_error_version_mismatch">应用版本不一致。请将两台设备更新到相同版本后重试。</string>
+    <string name="settings_transfer_error_version_mismatch">此传输文件由不同的 andClaw 版本创建。</string>
     <string name="settings_transfer_error_export_failed">无法导出传输文件。</string>
     <string name="settings_transfer_error_import_failed">无法导入传输文件。</string>
     <string name="settings_transfer_export_success">传输导出已完成。</string>
     <string name="settings_transfer_share_failed">无法分享传输文件。</string>
 </resources>
-
-

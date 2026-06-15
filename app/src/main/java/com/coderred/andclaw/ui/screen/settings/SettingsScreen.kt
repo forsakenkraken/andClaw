@@ -93,6 +93,7 @@ import com.coderred.andclaw.data.SetupStep
 import com.coderred.andclaw.data.BugReportEmailMetadata
 import com.coderred.andclaw.data.BugReportEmailSummary
 import com.coderred.andclaw.data.PreferencesManager
+import com.coderred.andclaw.data.transfer.TransferSizeLimits
 import com.coderred.andclaw.proroot.ExecutionRuntime
 import com.coderred.andclaw.ui.component.DefaultModelDialogOption
 import com.coderred.andclaw.ui.component.DefaultModelSelectionDialog
@@ -1746,6 +1747,40 @@ fun SettingsScreen(
         )
     }
 
+    if (transferUiState.versionMismatchConfirmation.isRequired) {
+        AlertDialog(
+            onDismissRequest = {
+                pendingTransferImportFile = null
+                viewModel.cancelTransferImportVersionMismatchConfirmation()
+                viewModel.clearTransferImportPassword()
+            },
+            shape = RoundedCornerShape(24.dp),
+            title = { Text(stringResource(R.string.settings_transfer_version_mismatch_title)) },
+            text = {
+                Text(
+                    text = stringResource(R.string.settings_transfer_version_mismatch_message),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.confirmTransferImportVersionMismatch() }) {
+                    Text(stringResource(R.string.settings_transfer_version_mismatch_yes))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        pendingTransferImportFile = null
+                        viewModel.cancelTransferImportVersionMismatchConfirmation()
+                        viewModel.clearTransferImportPassword()
+                    },
+                ) {
+                    Text(stringResource(R.string.settings_transfer_version_mismatch_no))
+                }
+            },
+        )
+    }
+
     when (transferUiState.exportAction.phase) {
         SettingsViewModel.TransferActionPhase.IN_PROGRESS -> {
             TransferStatusDialog(
@@ -2435,7 +2470,7 @@ internal data class TransferImportMetadata(
     val sizeBytes: Long?,
 )
 
-private const val MAX_TRANSFER_IMPORT_BYTES = 512L * 1024L * 1024L
+private const val MAX_TRANSFER_IMPORT_BYTES = TransferSizeLimits.MAX_TRANSFER_PAYLOAD_BYTES
 
 private fun readTransferImportMetadata(context: android.content.Context, uri: Uri): TransferImportMetadata {
     val projection = arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE)

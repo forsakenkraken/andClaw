@@ -5,6 +5,7 @@ package com.coderred.andclaw.data
 import android.content.Context
 import android.os.Build
 import com.coderred.andclaw.BuildConfig
+import com.coderred.andclaw.proroot.OpenClawPluginInstallStateStore
 import java.io.File
 import java.util.Locale
 
@@ -44,7 +45,7 @@ data class BugReportSessionErrorEntry(
 
 object BugReportBundleBuilder {
     fun collectSupplementalRuntimeAttachments(rootfsDir: File): List<BugReportTextAttachment> {
-        return collectSupplementalRuntimeLogSpecs(rootfsDir).mapNotNull { spec ->
+        val fileAttachments = collectSupplementalRuntimeLogSpecs(rootfsDir).mapNotNull { spec ->
             val file = resolveSupplementalRuntimeFile(rootfsDir, spec) ?: return@mapNotNull null
             if (!file.isFile) return@mapNotNull null
 
@@ -53,6 +54,13 @@ object BugReportBundleBuilder {
                 content = sanitizeSupplementalRuntimeFileContent(file, spec),
             )
         }
+        val pluginStateAttachment = OpenClawPluginInstallStateStore.readDiagnostic(rootfsDir)?.let { diagnostic ->
+            BugReportTextAttachment(
+                entryName = "runtime/openclaw/plugin-install-state.json",
+                content = diagnostic.json.toString(2) + "\n",
+            )
+        }
+        return fileAttachments + listOfNotNull(pluginStateAttachment)
     }
 
     fun collectSupplementalRuntimeLogLines(rootfsDir: File): List<String> {
@@ -72,6 +80,10 @@ object BugReportBundleBuilder {
                     .take(MAX_SUPPLEMENTAL_RUNTIME_LOG_LINES_PER_FILE)
                     .forEach(lines::add)
             }
+        }
+
+        OpenClawPluginInstallStateStore.readDiagnostic(rootfsDir)?.let { diagnostic ->
+            lines += diagnostic.summaryLine
         }
 
         return lines
@@ -221,6 +233,12 @@ private val SUPPLEMENTAL_RUNTIME_LOG_FILES = listOf(
         base = SupplementalRuntimeBase.ROOTFS,
         sourceRelativePath = "root/.openclaw/agents/main/agent/codex-home/codex-http-metrics.jsonl",
         zipEntryName = "runtime/codex/codex-http-metrics.jsonl",
+        sanitizeMode = SupplementalRuntimeSanitizeMode.OPENCLAW_LOG_TAIL,
+    ),
+    SupplementalRuntimeLogSpec(
+        base = SupplementalRuntimeBase.ROOTFS,
+        sourceRelativePath = "root/.openclaw/agents/main/agent/codex-home/codex-rust.log",
+        zipEntryName = "runtime/codex/codex-rust.log",
         sanitizeMode = SupplementalRuntimeSanitizeMode.OPENCLAW_LOG_TAIL,
     ),
 )

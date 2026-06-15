@@ -343,8 +343,12 @@ Kurtarma sürerken uygulamayı kapatmayın veya zorla durdurmayın.</string>
     <string name="settings_transfer_password_label">Aktarım parolası</string>
     <string name="settings_transfer_export_confirm">Dışa aktar</string>
     <string name="settings_transfer_import_confirm">İçe aktar</string>
-    <string name="settings_transfer_overwrite_title">Geçerli cihaz verileri üzerine yazılsın mı?</string>
-    <string name="settings_transfer_overwrite_message">Bu işlem başka bir cihazdan veri içe aktarır ve bu cihazın mevcut durumunun üzerine yazar.</string>
+    <string name="settings_transfer_overwrite_title">Bu cihaz başka bir cihaz yedeğiyle değiştirilsin mi?</string>
+    <string name="settings_transfer_overwrite_message">Başka bir cihazdan içe aktarma, bu cihazın OpenClaw ayarlarını, oturum açmalarını, oturumlarını ve belleğini yedek içeriğiyle değiştirir.</string>
+    <string name="settings_transfer_version_mismatch_title">Farklı andClaw sürümü</string>
+    <string name="settings_transfer_version_mismatch_message">Cihaz aktarımı yalnızca aynı andClaw sürümüyle tam uyumludur, ancak bu aktarım dosyası farklı bir sürümle oluşturulmuş. Yine de içe aktarılsın mı?</string>
+    <string name="settings_transfer_version_mismatch_yes">Evet</string>
+    <string name="settings_transfer_version_mismatch_no">Hayır</string>
     <string name="settings_transfer_progress_export">Şifrelenmiş aktarım dosyası oluşturuluyor…</string>
     <string name="settings_transfer_progress_import">Şifrelenmiş aktarım dosyası içe aktarılıyor…</string>
     <string name="settings_transfer_success_title">Cihaz aktarımı tamamlandı</string>
@@ -355,7 +359,7 @@ Kurtarma sürerken uygulamayı kapatmayın veya zorla durdurmayın.</string>
     <string name="settings_transfer_error_password_too_short">Şifre en az %1$d karakter olmalıdır.</string>
     <string name="settings_transfer_error_import_password_required">İçe aktarma parolası gerekli.</string>
     <string name="settings_transfer_error_wrong_password">Parola yanlış veya aktarım dosyası bozuk.</string>
-    <string name="settings_transfer_error_version_mismatch">Uygulama sürümü uyuşmuyor. Her iki cihazı da aynı sürüme güncelleyip tekrar deneyin.</string>
+    <string name="settings_transfer_error_version_mismatch">Bu aktarım dosyası farklı bir andClaw sürümüyle oluşturulmuş.</string>
     <string name="settings_transfer_error_export_failed">Aktarım dosyası dışa aktarılamadı.</string>
     <string name="settings_transfer_error_import_failed">Aktarım dosyası içe aktarılamadı.</string>
     <string name="settings_transfer_export_success">Aktarım dışa aktarma tamamlandı.</string>

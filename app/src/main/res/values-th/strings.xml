@@ -343,8 +343,12 @@
     <string name="settings_transfer_password_label">รหัสผ่านการถ่ายโอน</string>
     <string name="settings_transfer_export_confirm">ส่งออก</string>
     <string name="settings_transfer_import_confirm">นำเข้า</string>
-    <string name="settings_transfer_overwrite_title">เขียนทับข้อมูลอุปกรณ์ปัจจุบันหรือไม่?</string>
-    <string name="settings_transfer_overwrite_message">การดำเนินการนี้จะนำเข้าข้อมูลจากอุปกรณ์อื่นและเขียนทับสถานะปัจจุบันของอุปกรณ์นี้</string>
+    <string name="settings_transfer_overwrite_title">เขียนทับอุปกรณ์นี้ด้วยข้อมูลสำรองจากอุปกรณ์อื่นหรือไม่?</string>
+    <string name="settings_transfer_overwrite_message">การนำเข้าจากอุปกรณ์อื่นจะแทนที่การตั้งค่า OpenClaw การลงชื่อเข้าใช้ เซสชัน และหน่วยความจำของอุปกรณ์นี้ด้วยเนื้อหาในข้อมูลสำรอง</string>
+    <string name="settings_transfer_version_mismatch_title">เวอร์ชัน andClaw ต่างกัน</string>
+    <string name="settings_transfer_version_mismatch_message">การโอนย้ายอุปกรณ์เข้ากันได้อย่างสมบูรณ์เฉพาะกับ andClaw เวอร์ชันเดียวกัน แต่ไฟล์โอนย้ายนี้สร้างจากเวอร์ชันอื่น ต้องการนำเข้าต่อหรือไม่?</string>
+    <string name="settings_transfer_version_mismatch_yes">ใช่</string>
+    <string name="settings_transfer_version_mismatch_no">ไม่</string>
     <string name="settings_transfer_progress_export">กำลังสร้างไฟล์ถ่ายโอนที่เข้ารหัส…</string>
     <string name="settings_transfer_progress_import">กำลังนำเข้าไฟล์ถ่ายโอนที่เข้ารหัส…</string>
     <string name="settings_transfer_success_title">ถ่ายโอนอุปกรณ์เสร็จสิ้น</string>
@@ -355,12 +359,9 @@
     <string name="settings_transfer_error_password_too_short">รหัสผ่านต้องมีอย่างน้อย %1$d ตัวอักษร</string>
     <string name="settings_transfer_error_import_password_required">ต้องใส่รหัสผ่านสำหรับการนำเข้า</string>
     <string name="settings_transfer_error_wrong_password">รหัสผ่านไม่ถูกต้องหรือไฟล์ถ่ายโอนเสียหาย</string>
-    <string name="settings_transfer_error_version_mismatch">เวอร์ชันแอปไม่ตรงกัน อัปเดตทั้งสองอุปกรณ์ให้เป็นเวอร์ชันเดียวกันแล้วลองอีกครั้ง</string>
+    <string name="settings_transfer_error_version_mismatch">ไฟล์โอนย้ายนี้สร้างจาก andClaw เวอร์ชันอื่น</string>
     <string name="settings_transfer_error_export_failed">ส่งออกไฟล์ถ่ายโอนไม่สำเร็จ</string>
     <string name="settings_transfer_error_import_failed">นำเข้าไฟล์ถ่ายโอนไม่สำเร็จ</string>
     <string name="settings_transfer_export_success">ส่งออกไฟล์ถ่ายโอนเสร็จแล้ว</string>
     <string name="settings_transfer_share_failed">ไม่สามารถแชร์ไฟล์ถ่ายโอนได้</string>
 </resources>
-
-
-

@@ -43,15 +43,39 @@ object TransferManifestContract {
         SECTION_CODEX_AUTH,
     )
 
-    private val INCLUDED_ROOT_PREFIXES = setOf(
+    private val INCLUDED_EXACT_PATHS = setOf(
+        "root/.openclaw/openclaw.json",
+        "root/.codex/auth.json",
+    )
+
+    private val INCLUDED_PATH_PREFIXES = setOf(
         "root/.openclaw/",
-        "root/.codex/",
+        "root/.openclaw/agents/main/agent/",
+        "root/.openclaw/agents/main/sessions/",
+        "root/.openclaw/credentials/",
+    )
+
+    private val EXCLUDED_EXACT_PATHS = setOf(
+        "root/.openclaw/agents/main/agent/codex-home/codex-http-metrics.jsonl",
+        "root/.openclaw/agents/main/agent/codex-home/codex-rust.log",
+        "root/.openclaw/agents/main/agent/codex-home/logs.sqlite",
     )
 
     private val EXCLUDED_PATH_PREFIXES = setOf(
         "root/.openclaw/logs/",
         "root/.openclaw/.cache/",
         "root/.openclaw/tmp/",
+        "root/.openclaw/npm/",
+        "root/.openclaw/andclaw-bundled-plugins/",
+        "root/.openclaw/agents/main/agent/codex-home/codex-rust.log.",
+        "root/.openclaw/agents/main/agent/codex-home/log/",
+        "root/.openclaw/agents/main/agent/codex-home/logs/",
+        "root/.openclaw/agents/main/agent/codex-home/logs.sqlite-",
+        "root/.openclaw/agents/main/agent/codex-home/logs_",
+        "root/.openclaw/agents/main/agent/codex-home/.cache/",
+        "root/.openclaw/agents/main/agent/codex-home/cache/",
+        "root/.openclaw/agents/main/agent/codex-home/tmp/",
+        "root/.openclaw/agents/main/sessions/.stale-release-backup-",
         "root/.cache/",
         "tmp/",
         "var/tmp/",
@@ -154,8 +178,10 @@ object TransferManifestContract {
     // but actual archive entry names preserve original case from the filesystem.
     fun shouldIncludeExportPath(relativePath: String): Boolean {
         val normalizedPath = normalizeRelativePath(relativePath) ?: return false
+        if (normalizedPath in EXCLUDED_EXACT_PATHS) return false
         if (EXCLUDED_PATH_PREFIXES.any { normalizedPath.startsWith(it) }) return false
-        if (INCLUDED_ROOT_PREFIXES.any { normalizedPath.startsWith(it) }) return true
+        if (normalizedPath in INCLUDED_EXACT_PATHS) return true
+        if (INCLUDED_PATH_PREFIXES.any { normalizedPath.startsWith(it) }) return true
         return false
     }
 

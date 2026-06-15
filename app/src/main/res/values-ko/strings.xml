@@ -353,8 +353,12 @@
     <string name="settings_transfer_password_label">전송 비밀번호</string>
     <string name="settings_transfer_export_confirm">내보내기</string>
     <string name="settings_transfer_import_confirm">가져오기</string>
-    <string name="settings_transfer_overwrite_title">현재 기기 데이터를 덮어쓸까요?</string>
-    <string name="settings_transfer_overwrite_message">다른 기기의 데이터를 가져오며 현재 기기 상태를 덮어씁니다.</string>
+    <string name="settings_transfer_overwrite_title">다른 기기 백업으로 현재 기기를 덮어쓸까요?</string>
+    <string name="settings_transfer_overwrite_message">다른 기기에서 가져오면 현재 기기의 OpenClaw 설정, 로그인, 세션, 기억이 백업 내용으로 덮어써집니다.</string>
+    <string name="settings_transfer_version_mismatch_title">andClaw 버전이 다릅니다</string>
+    <string name="settings_transfer_version_mismatch_message">기기 전송은 같은 andClaw 버전에서만 완전히 호환되지만, 이 전송 파일은 현재 andClaw와 버전이 다릅니다. 그래도 가져올까요?</string>
+    <string name="settings_transfer_version_mismatch_yes">예</string>
+    <string name="settings_transfer_version_mismatch_no">아니요</string>
     <string name="settings_transfer_progress_export">암호화된 전송 파일을 만드는 중…</string>
     <string name="settings_transfer_progress_import">암호화된 전송 파일을 가져오는 중…</string>
     <string name="settings_transfer_success_title">기기 전송 완료</string>
@@ -365,7 +369,7 @@
     <string name="settings_transfer_error_password_too_short">비밀번호는 최소 %1$d자 이상이어야 합니다.</string>
     <string name="settings_transfer_error_import_password_required">가져오기 비밀번호를 입력해 주세요.</string>
     <string name="settings_transfer_error_wrong_password">비밀번호가 올바르지 않거나 전송 파일이 손상되었습니다.</string>
-    <string name="settings_transfer_error_version_mismatch">앱 버전이 일치하지 않습니다. 두 기기를 같은 버전으로 업데이트한 후 다시 시도하세요.</string>
+    <string name="settings_transfer_error_version_mismatch">이 전송 파일은 다른 andClaw 버전에서 만들어졌습니다.</string>
     <string name="settings_transfer_error_export_failed">전송 파일을 내보내지 못했습니다.</string>
     <string name="settings_transfer_error_import_failed">전송 파일을 가져오지 못했습니다.</string>
     <string name="settings_transfer_export_success">전송 파일 내보내기가 완료되었습니다.</string>

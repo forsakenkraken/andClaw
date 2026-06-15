@@ -343,8 +343,12 @@
     <string name="settings_transfer_password_label">Пароль переноса</string>
     <string name="settings_transfer_export_confirm">Экспортировать</string>
     <string name="settings_transfer_import_confirm">Импортировать</string>
-    <string name="settings_transfer_overwrite_title">Перезаписать текущие данные устройства?</string>
-    <string name="settings_transfer_overwrite_message">Будут импортированы данные с другого устройства и перезаписано текущее состояние этого устройства.</string>
+    <string name="settings_transfer_overwrite_title">Перезаписать это устройство резервной копией другого устройства?</string>
+    <string name="settings_transfer_overwrite_message">Импорт с другого устройства заменит настройки OpenClaw, входы, сеансы и память этого устройства содержимым резервной копии.</string>
+    <string name="settings_transfer_version_mismatch_title">Другая версия andClaw</string>
+    <string name="settings_transfer_version_mismatch_message">Перенос между устройствами полностью совместим только с той же версией andClaw, но этот файл создан в другой версии. Импортировать всё равно?</string>
+    <string name="settings_transfer_version_mismatch_yes">Да</string>
+    <string name="settings_transfer_version_mismatch_no">Нет</string>
     <string name="settings_transfer_progress_export">Создаётся зашифрованный файл переноса…</string>
     <string name="settings_transfer_progress_import">Импортируется зашифрованный файл переноса…</string>
     <string name="settings_transfer_success_title">Перенос устройства завершён</string>
@@ -355,12 +359,9 @@
     <string name="settings_transfer_error_password_too_short">Пароль должен содержать не менее %1$d символов.</string>
     <string name="settings_transfer_error_import_password_required">Требуется пароль для импорта.</string>
     <string name="settings_transfer_error_wrong_password">Неверный пароль или поврежденный файл переноса.</string>
-    <string name="settings_transfer_error_version_mismatch">Версии приложения не совпадают. Обновите оба устройства до одной версии и повторите попытку.</string>
+    <string name="settings_transfer_error_version_mismatch">Этот файл переноса создан в другой версии andClaw.</string>
     <string name="settings_transfer_error_export_failed">Не удалось экспортировать файл переноса.</string>
     <string name="settings_transfer_error_import_failed">Не удалось импортировать файл переноса.</string>
     <string name="settings_transfer_export_success">Экспорт файла переноса завершен.</string>
     <string name="settings_transfer_share_failed">Не удалось поделиться файлом переноса.</string>
 </resources>
-
-
-

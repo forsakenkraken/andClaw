@@ -343,8 +343,12 @@ Trong khi khôi phục đang chạy, đừng đóng hoặc buộc dừng ứng d
     <string name="settings_transfer_password_label">Mật khẩu chuyển thiết bị</string>
     <string name="settings_transfer_export_confirm">Xuất</string>
     <string name="settings_transfer_import_confirm">Nhập</string>
-    <string name="settings_transfer_overwrite_title">Ghi đè dữ liệu hiện tại của thiết bị?</string>
-    <string name="settings_transfer_overwrite_message">Thao tác này sẽ nhập dữ liệu từ thiết bị khác và ghi đè trạng thái hiện tại của thiết bị này.</string>
+    <string name="settings_transfer_overwrite_title">Ghi đè thiết bị này bằng bản sao lưu từ thiết bị khác?</string>
+    <string name="settings_transfer_overwrite_message">Nhập từ thiết bị khác sẽ thay thế cài đặt OpenClaw, đăng nhập, phiên và bộ nhớ của thiết bị này bằng nội dung bản sao lưu.</string>
+    <string name="settings_transfer_version_mismatch_title">Khác phiên bản andClaw</string>
+    <string name="settings_transfer_version_mismatch_message">Chuyển thiết bị chỉ tương thích đầy đủ với cùng phiên bản andClaw, nhưng tệp chuyển này được tạo bằng phiên bản khác. Vẫn nhập?</string>
+    <string name="settings_transfer_version_mismatch_yes">Có</string>
+    <string name="settings_transfer_version_mismatch_no">Không</string>
     <string name="settings_transfer_progress_export">Đang tạo tệp chuyển thiết bị đã mã hóa…</string>
     <string name="settings_transfer_progress_import">Đang nhập tệp chuyển thiết bị đã mã hóa…</string>
     <string name="settings_transfer_success_title">Chuyển thiết bị hoàn tất</string>
@@ -355,12 +359,9 @@ Trong khi khôi phục đang chạy, đừng đóng hoặc buộc dừng ứng d
     <string name="settings_transfer_error_password_too_short">Mật khẩu phải có ít nhất %1$d ký tự.</string>
     <string name="settings_transfer_error_import_password_required">Cần mật khẩu để nhập.</string>
     <string name="settings_transfer_error_wrong_password">Sai mật khẩu hoặc tệp chuyển thiết bị bị hỏng.</string>
-    <string name="settings_transfer_error_version_mismatch">Phiên bản ứng dụng không khớp. Cập nhật cả hai thiết bị lên cùng phiên bản và thử lại.</string>
+    <string name="settings_transfer_error_version_mismatch">Tệp chuyển này được tạo bằng một phiên bản andClaw khác.</string>
     <string name="settings_transfer_error_export_failed">Không thể xuất tệp chuyển thiết bị.</string>
     <string name="settings_transfer_error_import_failed">Không thể nhập tệp chuyển thiết bị.</string>
     <string name="settings_transfer_export_success">Xuất tệp chuyển thiết bị hoàn tất.</string>
     <string name="settings_transfer_share_failed">Không thể chia sẻ tệp chuyển thiết bị.</string>
 </resources>
-
-
-

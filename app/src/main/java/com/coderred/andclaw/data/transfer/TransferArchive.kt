@@ -5,6 +5,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.util.Locale
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -12,8 +13,6 @@ object TransferArchive {
     private const val ENTRY_MANIFEST = "manifest.json"
     private const val ENTRY_PREFERENCES = "preferences.json"
     private const val ENTRY_CHECKSUMS = "checksums.json"
-    private const val MAX_SINGLE_FILE_BYTES = 64L * 1024L * 1024L
-    private const val MAX_TOTAL_PAYLOAD_BYTES = 512L * 1024L * 1024L
     private const val STREAM_BUFFER_SIZE = 32 * 1024
 
     fun writeDeterministicArchive(
@@ -33,17 +32,19 @@ object TransferArchive {
         val preferencesBytes = encodeDeterministicPreferencesJson(normalizedPreferences)
             .toByteArray(StandardCharsets.UTF_8)
 
-        val curatedFiles = collectCuratedOpenClawFiles(rootfsDir, manifest)
+        val curatedFileSet = collectCuratedOpenClawFiles(rootfsDir, manifest)
+        val curatedFiles = curatedFileSet.includedFiles
 
         // Size check before writing
-        var totalPayloadBytes = 0L
-        curatedFiles.forEach { (_, file) ->
-            totalPayloadBytes += file.length()
-            if (totalPayloadBytes > MAX_TOTAL_PAYLOAD_BYTES) {
-                throw IllegalStateException(
-                    "Transfer payload exceeds the allowed total size limit (${MAX_TOTAL_PAYLOAD_BYTES / 1024 / 1024}MB)"
-                )
-            }
+        val totalPayloadBytes = curatedFiles.sumOf { (_, file) -> file.length() }
+        if (totalPayloadBytes > TransferSizeLimits.MAX_TRANSFER_PAYLOAD_BYTES) {
+            throw IllegalStateException(
+                buildPayloadLimitMessage(
+                    includedFiles = curatedFiles,
+                    excludedFiles = curatedFileSet.excludedFiles,
+                    totalPayloadBytes = totalPayloadBytes,
+                ),
+            )
         }
 
         // Single-pass: write ZIP entries and compute checksums simultaneously.
@@ -96,9 +97,10 @@ object TransferArchive {
         }
     }
 
-    private fun collectCuratedOpenClawFiles(rootfsDir: File, manifest: TransferManifest): List<Pair<String, File>> {
+    private fun collectCuratedOpenClawFiles(rootfsDir: File, manifest: TransferManifest): CuratedOpenClawFiles {
         val rootCanonical = rootfsDir.canonicalFile
         val entries = linkedMapOf<String, File>()
+        val excludedEntries = linkedMapOf<String, File>()
 
         val scanDirs = listOf(
             File(rootCanonical, "root/.openclaw"),
@@ -110,9 +112,9 @@ object TransferArchive {
             dir.walkTopDown()
                 .filter { it.isFile }
                 .forEach eachFile@{ file ->
-                    if (file.length() > MAX_SINGLE_FILE_BYTES) return@eachFile
                     val normalizedPath = normalizePathForArchive(file, rootCanonical) ?: return@eachFile
                     if (!TransferManifestContract.shouldIncludeExportPath(normalizedPath)) {
+                        excludedEntries[normalizedPath] = file
                         return@eachFile
                     }
                     entries[normalizedPath] = file
@@ -121,9 +123,14 @@ object TransferArchive {
 
         validateRequiredEntries(manifest, entries.keys)
 
-        return entries
-            .toList()
-            .sortedBy { (path, _) -> path }
+        return CuratedOpenClawFiles(
+            includedFiles = entries
+                .toList()
+                .sortedBy { (path, _) -> path },
+            excludedFiles = excludedEntries
+                .toList()
+                .sortedBy { (path, _) -> path },
+        )
     }
 
     private fun validateRequiredEntries(manifest: TransferManifest, exportedPaths: Set<String>) {
@@ -210,6 +217,93 @@ object TransferArchive {
         }
         return out.toString()
     }
+
+    private fun buildPayloadLimitMessage(
+        includedFiles: List<Pair<String, File>>,
+        excludedFiles: List<Pair<String, File>>,
+        totalPayloadBytes: Long,
+    ): String {
+        val includedSizeEntries = includedFiles.map { (path, file) -> SizeEntry(path, file.length()) }
+        val excludedSizeEntries = excludedFiles.map { (path, file) -> SizeEntry(path, file.length()) }
+            .filter { it.bytes > 0L }
+        val largestIncludedFiles = formatTopSizeEntries(includedSizeEntries)
+        val largestIncludedDirectories = formatTopSizeEntries(groupByDirectory(includedSizeEntries))
+        val largestExcludedFiles = formatTopSizeEntries(excludedSizeEntries)
+        val excludedTotalBytes = excludedSizeEntries.sumOf { it.bytes }
+
+        return buildString {
+            append("Transfer payload exceeds the allowed total size limit ")
+            append("(${TransferSizeLimits.MAX_TRANSFER_PAYLOAD_BYTES / 1024 / 1024}MB)")
+            append(": included=")
+            append(formatBytes(totalPayloadBytes))
+            append(" across ")
+            append(includedFiles.size)
+            append(" files")
+            append(". Largest included files: ")
+            append(largestIncludedFiles)
+            append(". Largest included directories: ")
+            append(largestIncludedDirectories)
+            if (excludedSizeEntries.isNotEmpty()) {
+                append(". Excluded transient files: ")
+                append(formatBytes(excludedTotalBytes))
+                append(" across ")
+                append(excludedSizeEntries.size)
+                append(" files; largest excluded: ")
+                append(largestExcludedFiles)
+            }
+        }
+    }
+
+    private fun groupByDirectory(entries: List<SizeEntry>): List<SizeEntry> {
+        return entries
+            .groupBy { summarizeDirectory(it.path) }
+            .map { (path, groupedEntries) -> SizeEntry(path, groupedEntries.sumOf { it.bytes }) }
+    }
+
+    private fun summarizeDirectory(path: String): String {
+        return when {
+            path.startsWith("root/.openclaw/agents/main/agent/codex-home/") ->
+                "root/.openclaw/agents/main/agent/codex-home"
+            path.startsWith("root/.openclaw/agents/main/agent/") ->
+                "root/.openclaw/agents/main/agent"
+            path.startsWith("root/.openclaw/agents/main/sessions/") ->
+                "root/.openclaw/agents/main/sessions"
+            path.startsWith("root/.openclaw/credentials/") ->
+                "root/.openclaw/credentials"
+            path.startsWith("root/.openclaw/") ->
+                "root/.openclaw"
+            path.startsWith("root/.codex/") ->
+                "root/.codex"
+            else -> path.substringBeforeLast('/', missingDelimiterValue = path)
+        }
+    }
+
+    private fun formatTopSizeEntries(entries: List<SizeEntry>, limit: Int = 5): String {
+        val topEntries = entries
+            .filter { it.bytes > 0L }
+            .sortedWith(compareByDescending<SizeEntry> { it.bytes }.thenBy { it.path })
+            .take(limit)
+        if (topEntries.isEmpty()) return "none"
+        return topEntries.joinToString("; ") { "${it.path}=${formatBytes(it.bytes)}" }
+    }
+
+    private fun formatBytes(bytes: Long): String {
+        val mib = bytes.toDouble() / (1024.0 * 1024.0)
+        if (mib < 1024.0) {
+            return String.format(Locale.US, "%.1fMB", mib)
+        }
+        return String.format(Locale.US, "%.2fGB", mib / 1024.0)
+    }
+
+    private data class CuratedOpenClawFiles(
+        val includedFiles: List<Pair<String, File>>,
+        val excludedFiles: List<Pair<String, File>>,
+    )
+
+    private data class SizeEntry(
+        val path: String,
+        val bytes: Long,
+    )
 
     private sealed interface EntryData
     private class InMemory(val bytes: ByteArray) : EntryData
