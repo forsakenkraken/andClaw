@@ -1,0 +1,42 @@
+name: Build andClaw Debug APK
+
+on:
+  workflow_dispatch:  # manual trigger
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source at tag v2.2.62
+        uses: actions/checkout@v4
+        with:
+          ref: 'v2.2.62'
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Set up Gradle cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Generate bundled assets (rootfs, node, chromium) via Docker
+        run: |
+          chmod +x scripts/setup-assets.sh
+          ./scripts/setup-assets.sh
+
+      - name: Build prodDebug APK
+        run: ./gradlew assembleProdDebug --no-daemon --stacktrace
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: andclaw-v2.2.62-debug-apk
+          path: app/build/outputs/apk/prod/debug/*.apk
+          retention-days: 30
